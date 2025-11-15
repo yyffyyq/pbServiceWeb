@@ -4,38 +4,41 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.io.Serializable;
-import java.util.Date;
 import lombok.Data;
 
+import java.io.Serializable;
+import java.util.Date;
+
 /**
- * @TableName sys_user
+ * 值班配置表
  */
-@TableName(value ="sys_user")
+@TableName("duty_config")
 @Data
-public class User implements Serializable {
+public class DutyConfig implements Serializable {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
-    private String dept;
+    /**
+     * 基准日期（用于判断单周/双周，该日期所在周为单周）
+     */
+    private Date baseDate;
 
-    private String userAccount;
-
-    private String userName;
-
-    private String userPassword;
-
-    private String phone;
-
-    private String userRole;
-
+    /**
+     * 创建时间
+     */
     private Date createTime;
 
+    /**
+     * 更新时间
+     */
     private Date updateTime;
+
+    /**
+     * 是否删除
+     */
     @TableLogic
     private Integer isDelete;
 
-
-
     private static final long serialVersionUID = 1L;
 }
+

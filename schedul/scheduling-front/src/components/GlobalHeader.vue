@@ -1,190 +1,285 @@
 <template>
   <div id="globalHeader">
-    <a-row :wrap="false">
-      <a-col flex="200px">
-        <RouterLink to="/">
+    <div class="header-container">
+      <div class="header-left">
+        <RouterLink to="/home">
           <div class="title-bar">
             <img class="logo" src="../assets/logo.png" alt="logo" />
             <div class="title">锦途集团</div>
           </div>
         </RouterLink>
-      </a-col>
-      <a-col flex="auto">
-        <a-menu
-          v-model:selectedKeys="current"
-          mode="horizontal"
-          :items="items"
-          @click="doMenuClick"
-        />
-      </a-col>
-      <a-col flex="120px">
+      </div>
+      <div class="header-center">
+        <div class="nav-menu">
+          <router-link to="/home" class="nav-item" :class="{ active: currentPath === '/home' }">
+            主页
+          </router-link>
+          <router-link
+            v-if="isAdmin"
+            to="/admin/userManage"
+            class="nav-item"
+            :class="{ active: currentPath === '/admin/userManage' }"
+          >
+            用户管理
+          </router-link>
+        </div>
+      </div>
+      <div class="header-right">
         <div class="user-login-status">
           <div v-if="loginUserStore.loginUser.id">
-            <a-dropdown>
-              <a-space>
-                <!-- <a-avatar :src="loginUserStore.loginUser.userAvatar"></a-avatar> -->
-                {{ loginUserStore.loginUser.userName ?? '无名' }}
-              </a-space>
-              <template #overlay>
-                <a-menu-item>
-                  <router-link to="/my_information">
-                    <UserOutlined />
-                    我的信息
-                  </router-link>
-                </a-menu-item>
-                <a-menu-item @click="doLogout">
-                  <LogoutOutlined />
-                  退出登录
-                </a-menu-item>
+            <el-dropdown @command="handleCommand">
+              <span class="user-dropdown-trigger">
+                <el-icon style="margin-right: 4px;"><User /></el-icon>
+                {{ loginUserStore.loginUser.userName || '无名' }}
+                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="info">
+                    <el-icon><User /></el-icon>
+                    <span style="margin-left: 8px;">我的信息</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="logout" divided>
+                    <el-icon><SwitchButton /></el-icon>
+                    <span style="margin-left: 8px;">退出登录</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
               </template>
-            </a-dropdown>
+            </el-dropdown>
           </div>
           <div v-else>
-            <a-button type="primary" href="/user/login">登录</a-button>
+            <el-button type="primary" @click="goToLogin">登录</el-button>
           </div>
         </div>
-      </a-col>
-    </a-row>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-
-import { useRouter } from 'vue-router'
-import { useLoginUserStore } from '@/stores/useLoginUserStore' // 注意：JS 版 Store 路径可能需去掉 .ts 后缀
-// 引入退出登录接口
-import { userLoginOutUsingPost } from '@/api/index'
 import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { User, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { useLoginUserStore } from '@/stores/useLoginUserStore'
+import { userLoginOutUsingPost } from '@/api/index'
 
 // 初始化 Pinia Store
 const loginUserStore = useLoginUserStore()
 // 初始化路由
 const router = useRouter()
+const route = useRoute()
 
-// 原始菜单数据（移除 TS 类型注解）
-const originItems = [
-  {
-    key: '/',
-    icon: () => h(HomeOutlined),
-    label: '主页',
-    title: '主页',
-  },
-  {
-    key: '/admin/userManage',
-    label: '用户管理',
-    title: '用户管理',
-  },
-  {
-    key: '/admin/pictureManage',
-    label: '图片管理',
-    title: '图片管理',
-  },
-  {
-    key: '/admin/spaceManage',
-    label: '空间管理',
-    title: '空间管理',
-  },
-  {
-    key: '/add_picture',
-    label: '创建图片',
-    title: '创建图片',
-  },
+// 当前路径
+const currentPath = computed(() => route.path)
 
-]
-
-// 过滤菜单（管理员才显示 /admin 开头的菜单）
-const filterMenus = (menus = []) => {
-  if (!Array.isArray(menus)) {
-    return []
-  }
-  return menus.filter((menu) => {
-    // 管理员菜单过滤逻辑
-    if (menu.key.startsWith('/admin')) {
-      const loginUser = loginUserStore.loginUser
-      // 非登录状态或非管理员角色，隐藏该菜单
-      if (!loginUser || loginUser.userRole !== 'admin') {
-        return false
-      }
-    }
+// 判断是否为管理员
+const isAdmin = computed(() => {
+  // 优先从 store 获取
+  if (loginUserStore.loginUser && loginUserStore.loginUser.userRole === 'admin') {
     return true
-  })
+  }
+  // 如果 store 中没有，从 localStorage 获取
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo) {
+      const user = JSON.parse(userInfo)
+      return user.userRole === 'admin'
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+  return false
+})
+
+// 下拉菜单命令处理
+const handleCommand = (command) => {
+  if (command === 'info') {
+    router.push('/my_information')
+  } else if (command === 'logout') {
+    doLogout()
+  }
 }
 
-// 计算属性：动态生成过滤后的菜单
-const items = computed(() => filterMenus(originItems))
-
-// 当前选中菜单（默认空数组）
-const current = ref([])
-
-// 路由跳转事件
-const doMenuClick = ({ key }) => {
-  // 仅处理路由路径类型的菜单（排除外部链接）
-  if (key.startsWith('/')) {
-    router.push({
-      path: key,
-    })
-  }
+// 跳转到登录页
+const goToLogin = () => {
+  router.push('/user/login')
 }
 
 // 退出登录
 const doLogout = async () => {
+  // 先清除本地数据（无论后端请求是否成功）
+  const clearLocalData = () => {
+    // 重置 Pinia 中的用户信息
+    loginUserStore.setLoginUser({
+      userName: '',
+      id: '', // 清空 id，让登录状态判断失效
+      userRole: ''
+    })
+    // 清除本地存储的用户信息
+    localStorage.removeItem('userInfo')
+    // 清除 token
+    localStorage.removeItem('vue_login_token')
+  }
+
   try {
     const res = await userLoginOutUsingPost()
     console.log(res)
+    
+    // 无论后端返回什么，都清除本地数据
+    clearLocalData()
+    
     // 适配后端返回格式：code=0 为成功
-    if (res.data.code === 0) {
-      // 重置 Pinia 中的用户信息
-      loginUserStore.setLoginUser({
-        userName: '',
-        id: '', // 清空 id，让登录状态判断失效
-        userRole: ''
-      })
-      // 清除本地存储的用户信息（如果之前存储过）
-      localStorage.removeItem('userInfo')
-      message.success('退出登录成功')
-      // 跳转到登录页
-      router.push({ path: '/user/login' })
+    if (res.code === 0 || res.data?.code === 0) {
+      ElMessage.success('退出登录成功')
     } else {
-      message.error('退出登录失败，' + (res.data.message || '请重试'))
+      // 即使后端返回错误（如"未登录"），也允许退出
+      // 可能是 session 已过期，但用户点击了退出，应该允许退出
+      const errorMsg = res.data?.message || res.message || ''
+      if (errorMsg.includes('未登录') || errorMsg.includes('登录')) {
+        ElMessage.success('已退出登录')
+      } else {
+        ElMessage.warning('退出登录：' + errorMsg)
+      }
     }
+    
+    // 跳转到登录页
+    router.push({ path: '/user/login' })
   } catch (err) {
     console.error('退出登录请求失败：', err)
-    message.error('退出登录失败，网络异常')
+    
+    // 即使请求失败（网络错误、后端错误等），也清除本地数据并退出
+    clearLocalData()
+    
+    // 检查是否是"未登录"相关的错误
+    const errorMsg = err.response?.data?.message || err.message || ''
+    if (errorMsg.includes('未登录') || errorMsg.includes('登录')) {
+      ElMessage.success('已退出登录')
+    } else {
+      ElMessage.warning('退出登录：' + (errorMsg || '网络异常，已清除本地登录信息'))
+    }
+    
+    router.push({ path: '/user/login' })
   }
 }
-
-// 监听路由变化，更新当前选中菜单
-router.afterEach((to) => {
-  current.value = [to.path]
-})
 </script>
 
 <style scoped>
+#globalHeader {
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 0 24px;
+  height: 64px;
+  box-sizing: border-box;
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  max-width: 100%;
+}
+
+.header-left {
+  flex: 0 0 200px;
+  display: flex;
+  align-items: center;
+}
+
 .title-bar {
   display: flex;
   align-items: center;
+  text-decoration: none;
+  color: inherit;
 }
 
 .title {
   color: black;
   font-size: 18px;
   margin-left: 16px;
+  font-weight: 600;
 }
 
 .logo {
   height: 24px;
 }
 
-/* 调整用户区域样式，避免溢出 */
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.nav-item {
+  padding: 8px 16px;
+  text-decoration: none;
+  color: #606266;
+  font-size: 14px;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.nav-item:hover {
+  color: #409eff;
+  background-color: #ecf5ff;
+}
+
+.nav-item.active {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.header-right {
+  flex: 0 0 200px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 .user-login-status {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
 }
 
-/* 适配下拉菜单样式 */
-.ant-dropdown-menu-item {
+.user-dropdown-trigger {
+  display: flex;
+  align-items: center;
   cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+  color: #606266;
+  font-size: 14px;
+}
+
+.user-dropdown-trigger:hover {
+  background-color: #f5f7fa;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .header-left {
+    flex: 0 0 150px;
+  }
+  
+  .header-center {
+    display: none;
+  }
+  
+  .header-right {
+    flex: 1;
+  }
+  
+  .title {
+    font-size: 16px;
+    margin-left: 8px;
+  }
 }
 </style>

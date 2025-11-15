@@ -33,11 +33,16 @@
             :loading="loading" 
             style="width: 100%" 
             @click="handleLogin"
+            :disabled="loading"
           >
-            登录
+            {{ loading ? '登录中...' : '登录' }}
           </el-button>
         </el-form-item>
       </el-form>
+      <div class="login-footer">
+        <span class="register-tip">还没有账号？</span>
+        <router-link to="/user/register" class="register-link">立即注册</router-link>
+      </div>
     </div>
   </div>
 </template>
@@ -46,11 +51,14 @@
 import { ref, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
+import { RouterLink } from 'vue-router';
 import { getLogin } from '@/api/index';
+import { useLoginUserStore } from '@/stores/useLoginUserStore';
 
 const router = useRouter();
 const loginFormRef = ref(null); // 表单引用
 const loading = ref(false); // 登录按钮加载状态
+const loginUserStore = useLoginUserStore(); // 初始化 Pinia Store
 
 // 登录表单数据（与后端请求字段一致：userAccount、userPassword）
 const loginForm = reactive({
@@ -86,12 +94,16 @@ const handleLogin = () => {
           // 1. 存储用户信息到本地缓存（页面刷新不丢失）
           localStorage.setItem('userInfo', JSON.stringify(userInfo));
           
-          // 2. 可选：如果后端后续接口需要 Token，可让后端在 data 中返回 token 字段，此处存储
+          // 2. 手动设置用户信息到 Pinia Store
+          loginUserStore.setLoginUser(userInfo);
+          
+          // 3. 可选：如果后端后续接口需要 Token，可让后端在 data 中返回 token 字段，此处存储
           // localStorage.setItem('token', userInfo.token);
 
           ElMessage.success('登录成功！');
-          // 跳转到首页（根据你的路由配置调整）
-          router.push('/');
+          // 跳转到首页或之前访问的页面
+          const redirect = router.currentRoute.value.query.redirect;
+          router.push(redirect || '/home');
         } else {
           // 登录失败（如账号密码错误），显示后端返回的错误信息
           ElMessage.error(res.message || '登录失败，请重试');
@@ -149,5 +161,28 @@ const handleLogin = () => {
   border-radius: 8px;
   height: 44px;
   font-size: 16px;
+}
+
+.login-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: #606266;
+}
+
+.register-tip {
+  margin-right: 4px;
+}
+
+.register-link {
+  color: #409eff;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.register-link:hover {
+  color: #66b1ff;
+  text-decoration: underline;
 }
 </style>

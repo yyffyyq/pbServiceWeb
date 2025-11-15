@@ -1,10 +1,14 @@
 package com.zjintu.schedul.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.zjintu.schedul.model.dto.user.UserQueryRequest;
 import com.zjintu.schedul.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zjintu.schedul.model.vo.LoginUserVO;
+import com.zjintu.schedul.model.vo.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
 * @author Administrator
@@ -24,4 +28,11 @@ public interface UserService extends IService<User> {
     LoginUserVO getLoginUserVO(User user);
 
     boolean userLoginOut(HttpServletRequest request);
+
+    UserVO getUserVO(User user);
+
+    List<UserVO> getUserVOList(List<User> userList);
+
+
+    QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
 }
