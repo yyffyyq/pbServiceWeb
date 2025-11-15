@@ -16,6 +16,7 @@
     "@vueup/vue-quill": "^1.2.0",
     "axios": "^1.12.2",
     "element-plus": "^2.11.7",
+    "html2canvas": "^1.4.1",
     "mitt": "^3.0.1",
     "nprogress": "^0.2.0",
     "pinia": "^3.0.3",

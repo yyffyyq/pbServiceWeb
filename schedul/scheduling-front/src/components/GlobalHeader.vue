@@ -4,7 +4,7 @@
       <div class="header-left">
         <RouterLink to="/home">
           <div class="title-bar">
-            <img class="logo" src="../assets/logo.png" alt="logo" />
+            <img class="logo" src="../assets/logo/logo.jpg" alt="logo" />
             <div class="title">锦途集团</div>
           </div>
         </RouterLink>

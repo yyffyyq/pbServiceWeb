@@ -285,40 +285,56 @@
       </template>
     </el-dialog>
 
-    <!-- 查看日期详情对话框 -->
+    <!-- 查看日期详情对话框（新增导出功能） -->
     <el-dialog
       v-model="showDayDetailDialog"
       title="值班人员详情"
       width="600px"
     >
-      <div class="day-detail">
-        <div class="detail-date">
-          <el-icon><Calendar /></el-icon>
-          <span>{{ selectedDayInfo.dateStr }}</span>
-          <el-tag :type="selectedDayInfo.isWeekend ? 'warning' : 'primary'" size="small" style="margin-left: 8px;">
-            {{ selectedDayInfo.weekdayName }}
-          </el-tag>
-        </div>
-        <div class="detail-persons" v-if="selectedDayInfo.dutyPersons && selectedDayInfo.dutyPersons.length > 0">
-          <div
-            v-for="(person, index) in selectedDayInfo.dutyPersons"
-            :key="index"
-            class="person-card"
-          >
-            <div class="person-header">
-              <span class="person-name">{{ person.userName }}</span>
-              <el-tag size="small" type="info">{{ person.dept || '未设置部门' }}</el-tag>
-            </div>
-            <div class="person-info">
-              <div class="info-item">
-                <el-icon><Phone /></el-icon>
-                <span>{{ person.phone || '未设置手机号' }}</span>
+      <!-- 导出按钮 -->
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+        <el-button 
+          type="success" 
+          :icon="Download" 
+          @click="exportDetailToPng"
+          :loading="exportLoading"
+        >
+          导出详情为PNG
+        </el-button>
+      </div>
+      
+      <!-- 导出目标容器（添加ref标识，用于截图） -->
+      <div ref="exportContainer" class="export-container">
+        <div class="day-detail">
+          <div class="detail-date">
+            <el-icon><Calendar /></el-icon>
+            <span>{{ selectedDayInfo.dateStr }}</span>
+            <el-tag :type="selectedDayInfo.isWeekend ? 'warning' : 'primary'" size="small" style="margin-left: 8px;">
+              {{ selectedDayInfo.weekdayName }}
+            </el-tag>
+          </div>
+          <div class="detail-persons" v-if="selectedDayInfo.dutyPersons && selectedDayInfo.dutyPersons.length > 0">
+            <div
+              v-for="(person, index) in selectedDayInfo.dutyPersons"
+              :key="index"
+              class="person-card"
+            >
+              <div class="person-header">
+                <span class="person-name">{{ person.userName }}</span>
+                <el-tag size="small" type="info">{{ person.dept || '未设置部门' }}</el-tag>
+              </div>
+              <div class="person-info">
+                <div class="info-item">
+                  <el-icon><Phone /></el-icon>
+                  <span>{{ person.phone || '未设置手机号' }}</span>
+                </div>
               </div>
             </div>
           </div>
+          <el-empty v-else description="该日期未安排值班人员" />
         </div>
-        <el-empty v-else description="该日期未安排值班人员" />
       </div>
+      
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showDayDetailDialog = false">关闭</el-button>
@@ -329,7 +345,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
@@ -340,8 +356,11 @@ import {
   Delete,
   Edit,
   Calendar,
-  Phone
+  Phone,
+  Download // 新增导出图标
 } from '@element-plus/icons-vue'
+// 引入html2canvas（核心导出依赖）
+import html2canvas from 'html2canvas'
 import {
   listUserVOByPage,
   getUserById,
@@ -358,6 +377,10 @@ import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
 // 初始化 Pinia Store
 const loginUserStore = useLoginUserStore()
+
+// 新增：导出相关状态
+const exportContainer = ref(null) // 导出目标容器ref
+const exportLoading = ref(false) // 导出加载状态
 
 // 响应式数据
 const currentDate = ref(new Date().toISOString().slice(0, 7)) // YYYY-MM
@@ -1012,6 +1035,53 @@ const initUserInfo = () => {
   }
 }
 
+// 新增：导出详情为PNG
+const exportDetailToPng = async () => {
+  exportLoading.value = true
+  try {
+    // 等待DOM更新完成
+    await nextTick()
+    
+    // 获取导出容器
+    const container = exportContainer.value
+    if (!container) {
+      ElMessage.error('导出容器不存在')
+      return
+    }
+
+    // 配置html2canvas（高清导出）
+    const canvas = await html2canvas(container, {
+      scale: 2, // 缩放比例，2倍高清
+      useCORS: true, // 允许跨域图片
+      logging: false, // 关闭日志
+      width: container.offsetWidth,
+      height: container.offsetHeight,
+      windowWidth: container.scrollWidth,
+      windowHeight: container.scrollHeight,
+      backgroundColor: '#ffffff' // 背景色（避免透明）
+    })
+
+    // 转换为Blob并下载
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    
+    // 文件名：值班详情_日期.png
+    a.download = `值班详情_${selectedDayInfo.dateStr}.png`
+    a.href = url
+    a.click()
+    
+    // 释放URL对象
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功！')
+  } catch (error) {
+    console.error('导出PNG失败:', error)
+    ElMessage.error('导出失败，请重试')
+  } finally {
+    exportLoading.value = false
+  }
+}
+
 // 组件挂载时加载数据
 onMounted(async () => {
   // 先初始化用户信息
@@ -1331,6 +1401,13 @@ onMounted(async () => {
 /* 日期详情对话框样式 */
 .day-detail {
   padding: 16px 0;
+}
+
+/* 导出容器样式（确保截图完整） */
+.export-container {
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 8px;
 }
 
 .detail-date {
