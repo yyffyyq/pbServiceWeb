@@ -208,6 +208,8 @@
                 'duty-day': isDutyDay(data.day),
                 'today': isToday(data.day)
               }"
+              @click="handleDateClick(data.day)"
+              style="cursor: pointer;"
             >
               <div class="day-number">{{ data.day.split('-').slice(-1)[0] }}</div>
               <div v-if="isDutyDay(data.day)" class="duty-badge">值班</div>
@@ -218,6 +220,28 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="showLogDialog = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 值班备注详情对话框 -->
+    <el-dialog
+      v-model="showRemarkDialog"
+      title="值班备注"
+      width="500px"
+    >
+      <div v-if="currentRemark">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="值班日期">{{ currentRemarkDate }}</el-descriptions-item>
+          <el-descriptions-item label="调班备注">
+            <el-text>{{ currentRemark }}</el-text>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <el-empty v-else description="该日期没有值班记录或备注" />
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showRemarkDialog = false">关闭</el-button>
         </div>
       </template>
     </el-dialog>
@@ -374,6 +398,12 @@ const showLogDialog = ref(false)
 const currentLogUser = ref(null)
 const logCalendarDate = ref(new Date())
 const dutyRecordDates = ref([])
+const dutyRecordsMap = ref({})
+
+// 备注对话框相关
+const showRemarkDialog = ref(false)
+const currentRemark = ref('')
+const currentRemarkDate = ref('')
 
 // 批量获取值班天数（从后端接口）
 const loadDutyCounts = async (userList) => {
@@ -691,6 +721,7 @@ const handleShowLog = async (row) => {
   currentLogUser.value = row
   logCalendarDate.value = new Date()
   dutyRecordDates.value = []
+  dutyRecordsMap.value = {}
   showLogDialog.value = true
   
   try {
@@ -700,22 +731,40 @@ const handleShowLog = async (row) => {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       
-      dutyRecordDates.value = res.data
-        .filter(record => {
-          const dutyDate = new Date(record.dutyDate)
-          dutyDate.setHours(0, 0, 0, 0)
-          return dutyDate < today // 只显示今天之前的日期
-        })
-        .map(record => {
-          const date = new Date(record.dutyDate)
-          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-        })
+      const recordsMap = {}
+      const dates = []
+      
+      res.data.forEach(record => {
+        const dutyDate = new Date(record.dutyDate)
+        dutyDate.setHours(0, 0, 0, 0)
+        
+        if (dutyDate < today) { // 只显示今天之前的日期
+          const dateStr = `${dutyDate.getFullYear()}-${String(dutyDate.getMonth() + 1).padStart(2, '0')}-${String(dutyDate.getDate()).padStart(2, '0')}`
+          dates.push(dateStr)
+          recordsMap[dateStr] = record
+        }
+      })
+      
+      dutyRecordDates.value = dates
+      dutyRecordsMap.value = recordsMap
     } else {
       ElMessage.error('获取值班记录失败')
     }
   } catch (error) {
     console.error('获取值班记录失败:', error)
     ElMessage.error('获取值班记录失败')
+  }
+}
+
+// 处理日期点击
+const handleDateClick = (dateStr) => {
+  const record = dutyRecordsMap.value[dateStr]
+  if (record) {
+    currentRemarkDate.value = dateStr
+    currentRemark.value = record.remark || '无备注'
+    showRemarkDialog.value = true
+  } else {
+    ElMessage.info('该日期没有值班记录')
   }
 }
 

@@ -63,7 +63,7 @@ public class DutyController {
         Long id = dutyService.addDutyPerson(request);
         // 添加人员后，更新从今天开始的未来值班记录
         try {
-            dutyRecordService.updateFutureDutyRecords();
+            dutyRecordService.updateFutureDutyRecords(request.getRemark());
         } catch (Exception e) {
             // 记录更新失败不影响添加操作
             e.printStackTrace();
@@ -81,7 +81,7 @@ public class DutyController {
         Boolean result = dutyService.deleteDutyPerson(deleteRequest.getId());
         // 删除人员后，更新从今天开始的未来值班记录
         try {
-            dutyRecordService.updateFutureDutyRecords();
+            dutyRecordService.updateFutureDutyRecords(deleteRequest.getRemark());
         } catch (Exception e) {
             // 记录更新失败不影响删除操作
             e.printStackTrace();

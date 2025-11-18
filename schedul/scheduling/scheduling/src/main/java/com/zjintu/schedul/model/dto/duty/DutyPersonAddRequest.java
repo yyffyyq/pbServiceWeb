@@ -19,6 +19,11 @@ public class DutyPersonAddRequest implements Serializable {
      */
     private String dutyType;
 
+    /**
+     * 调班备注（添加或删除人员的原因）
+     */
+    private String remark;
+
     private static final long serialVersionUID = 1L;
 }
 

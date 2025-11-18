@@ -54,6 +54,10 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Integer generateDutyRecordsForDate(Date date) {
+        return generateDutyRecordsForDate(date, null);
+    }
+
+    private Integer generateDutyRecordsForDate(Date date, String remark) {
         if (date == null) {
             return 0;
         }
@@ -80,6 +84,7 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
                 record.setDutyDate(date);
                 record.setDutyType(person.getDutyType());
                 record.setStatus("normal");
+                record.setRemark(remark); // 设置备注
                 this.save(record);
                 count++;
             }
@@ -91,6 +96,12 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Integer generateDutyRecordsForDateRange(Date startDate, Date endDate) {
+        return generateDutyRecordsForDateRange(startDate, endDate, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Integer generateDutyRecordsForDateRange(Date startDate, Date endDate, String remark) {
         if (startDate == null || endDate == null) {
             return 0;
         }
@@ -112,7 +123,7 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
 
         while (!calendar.after(endCal)) {
             Date currentDate = calendar.getTime();
-            int count = generateDutyRecordsForDate(currentDate);
+            int count = generateDutyRecordsForDate(currentDate, remark);
             totalCount += count;
             calendar.add(Calendar.DAY_OF_MONTH, 1);
         }
@@ -122,7 +133,7 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Integer updateFutureDutyRecords() {
+    public Integer updateFutureDutyRecords(String remark) {
         // 获取今天的日期（从今天开始更新）
         Calendar today = Calendar.getInstance();
         today.set(Calendar.HOUR_OF_DAY, 0);
@@ -142,7 +153,7 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
         endDate.setTime(todayDate);
         endDate.add(Calendar.MONTH, 1);
 
-        return generateDutyRecordsForDateRange(todayDate, endDate.getTime());
+        return generateDutyRecordsForDateRange(todayDate, endDate.getTime(), remark);
     }
 
     @Override

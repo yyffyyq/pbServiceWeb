@@ -271,6 +271,16 @@
             </el-tag>
           </div>
         </el-form-item>
+        <el-form-item label="调班备注" prop="remark">
+          <el-input
+            v-model="personForm.remark"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入调班原因或备注信息"
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -527,8 +537,8 @@ const selectedDayInfo = reactive({
 })
 
 // 人员表单数据
-const personForm = reactive({
-  userIds: []
+const personForm = reactive({  userIds: [],
+  remark: ''
 })
 
 // 表单验证规则
@@ -536,6 +546,10 @@ const personFormRules = {
   userIds: [
     { required: true, message: '请选择用户', trigger: 'change' },
     { type: 'array', min: 1, message: '请至少选择一个用户', trigger: 'change' }
+  ],
+  remark: [
+    { required: true, message: '请输入调班备注', trigger: 'blur' },
+    { min: 2, max: 200, message: '备注长度在20到200个字符', trigger: 'blur' }
   ]
 }
 
@@ -811,15 +825,30 @@ const handleAddSaturdayDuty = (group) => {
 
 // 删除工作日值班人员
 const handleRemoveWeekdayDuty = async (index) => {
-  ElMessageBox.confirm('确定要删除该值班人员吗？', '提示', {
+  const person = weekdayDutyList.value[index]
+  
+  // 弹出备注输入框
+  ElMessageBox.prompt('请输入删除该值班人员的原因（调班备注）', '删除确认', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    const person = weekdayDutyList.value[index]
+    inputPlaceholder: '请输入调班原因',
+    inputValidator: (value) => {
+      if (!value || value.trim().length < 2) {
+        return '备注至少需要2个字符'
+      }
+      if (value.length > 200) {
+        return '备注长度不能超过200个字符'
+      }
+      return true
+    },
+    inputErrorMessage: '请输入有效的备注'
+  }).then(async ({ value: remark }) => {
     if (person.dutyPersonId) {
       try {
-        const res = await deleteDutyPerson({ id: person.dutyPersonId })
+        const res = await deleteDutyPerson({ 
+          id: person.dutyPersonId,
+          remark: remark
+        })
         if (res.code === 0) {
           ElMessage.success('删除成功')
           // 重新加载配置
@@ -840,15 +869,30 @@ const handleRemoveWeekdayDuty = async (index) => {
 
 // 删除周六值班人员
 const handleRemoveSaturdayDuty = async (group, index) => {
-  ElMessageBox.confirm('确定要删除该值班人员吗？', '提示', {
+  const person = group === 'group1' ? saturdayGroup1.value[index] : saturdayGroup2.value[index]
+  
+  // 弹出备注输入框
+  ElMessageBox.prompt('请输入删除该值班人员的原因（调班备注）', '删除确认', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    const person = group === 'group1' ? saturdayGroup1.value[index] : saturdayGroup2.value[index]
+    inputPlaceholder: '请输入调班原因',
+    inputValidator: (value) => {
+      if (!value || value.trim().length < 2) {
+        return '备注至少需要2个字符'
+      }
+      if (value.length > 200) {
+        return '备注长度不能超过200个字符'
+      }
+      return true
+    },
+    inputErrorMessage: '请输入有效的备注'
+  }).then(async ({ value: remark }) => {
     if (person.dutyPersonId) {
       try {
-        const res = await deleteDutyPerson({ id: person.dutyPersonId })
+        const res = await deleteDutyPerson({ 
+          id: person.dutyPersonId,
+          remark: remark
+        })
         if (res.code === 0) {
           ElMessage.success('删除成功')
           // 重新加载配置
@@ -877,15 +921,30 @@ const handleAddMonthEndDuty = () => {
 
 // 删除月末值班人员
 const handleRemoveMonthEndDuty = async (index) => {
-  ElMessageBox.confirm('确定要删除该值班人员吗？', '提示', {
+  const person = monthEndDutyList.value[index]
+  
+  // 弹出备注输入框
+  ElMessageBox.prompt('请输入删除该值班人员的原因（调班备注）', '删除确认', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    const person = monthEndDutyList.value[index]
+    inputPlaceholder: '请输入调班原因',
+    inputValidator: (value) => {
+      if (!value || value.trim().length < 2) {
+        return '备注至少需要2个字符'
+      }
+      if (value.length > 200) {
+        return '备注长度不能超过200个字符'
+      }
+      return true
+    },
+    inputErrorMessage: '请输入有效的备注'
+  }).then(async ({ value: remark }) => {
     if (person.dutyPersonId) {
       try {
-        const res = await deleteDutyPerson({ id: person.dutyPersonId })
+        const res = await deleteDutyPerson({ 
+          id: person.dutyPersonId,
+          remark: remark
+        })
         if (res.code === 0) {
           ElMessage.success('删除成功')
           // 重新加载配置
@@ -1006,7 +1065,8 @@ const handleSubmitPerson = async () => {
         try {
           const res = await addDutyPerson({
             userId: userId,
-            dutyType: dutyType
+            dutyType: dutyType,
+            remark: personForm.remark
           })
 
           if (res.code === 0) {
@@ -1048,7 +1108,8 @@ const handleSubmitPerson = async () => {
 // 重置人员表单
 const resetPersonForm = () => {
   Object.assign(personForm, {
-    userIds: []
+    userIds: [],
+    remark: ''
   })
   personFormRef.value?.clearValidate()
 }

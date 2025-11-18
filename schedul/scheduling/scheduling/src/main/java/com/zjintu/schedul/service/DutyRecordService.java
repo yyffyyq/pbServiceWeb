@@ -38,10 +38,20 @@ public interface DutyRecordService extends IService<DutyRecord> {
     Integer generateDutyRecordsForDateRange(Date startDate, Date endDate);
 
     /**
+     * 生成指定日期范围的值班记录
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @param remark 调班备注
+     * @return 生成的记录数
+     */
+    Integer generateDutyRecordsForDateRange(Date startDate, Date endDate, String remark);
+
+    /**
      * 更新从今天开始的未来值班记录（用于配置变更后更新未来排班）
+     * @param remark 调班备注
      * @return 更新的记录数
      */
-    Integer updateFutureDutyRecords();
+    Integer updateFutureDutyRecords(String remark);
 
     /**
      * 根据日期范围获取值班记录
