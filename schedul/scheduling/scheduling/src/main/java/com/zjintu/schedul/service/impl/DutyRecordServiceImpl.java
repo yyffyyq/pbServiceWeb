@@ -4,7 +4,9 @@ package com.zjintu.schedul.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.mapper.DutyRecordMapper;
+import com.zjintu.schedul.mapper.UserMapper;
 import com.zjintu.schedul.model.entity.DutyRecord;
+import com.zjintu.schedul.model.entity.User;
 import com.zjintu.schedul.model.vo.DutyPersonVO;
 import com.zjintu.schedul.model.vo.DutyRecordVO;
 import com.zjintu.schedul.service.DutyRecordService;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -30,6 +33,9 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
 
     @Resource
     private DutyService dutyService;
+
+    @Resource
+    private UserMapper userMapper;
 
     @Override
     public List<DutyRecordVO> getDutyRecordsByUserId(Long userId) {
@@ -127,8 +133,8 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
 
         // 删除今天及以后的所有值班记录
         QueryWrapper<DutyRecord> deleteWrapper = new QueryWrapper<>();
-        deleteWrapper.ge("duty_date", todayDate);
-        deleteWrapper.eq("is_delete", 0);
+        deleteWrapper.ge("dutyDate", todayDate);
+        deleteWrapper.eq("isDelete", 0);
         this.remove(deleteWrapper);
 
         // 重新生成未来一个月的值班记录（根据新的配置）
@@ -137,6 +143,50 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
         endDate.add(Calendar.MONTH, 1);
 
         return generateDutyRecordsForDateRange(todayDate, endDate.getTime());
+    }
+
+    @Override
+    public List<DutyRecordVO> getDutyRecordsByDateRange(Date startDate, Date endDate) {
+        if (startDate == null || endDate == null) {
+            return new ArrayList<>();
+        }
+
+        // 设置时间为0点
+        Calendar startCal = Calendar.getInstance();
+        startCal.setTime(startDate);
+        startCal.set(Calendar.HOUR_OF_DAY, 0);
+        startCal.set(Calendar.MINUTE, 0);
+        startCal.set(Calendar.SECOND, 0);
+        startCal.set(Calendar.MILLISECOND, 0);
+
+        Calendar endCal = Calendar.getInstance();
+        endCal.setTime(endDate);
+        endCal.set(Calendar.HOUR_OF_DAY, 23);
+        endCal.set(Calendar.MINUTE, 59);
+        endCal.set(Calendar.SECOND, 59);
+        endCal.set(Calendar.MILLISECOND, 999);
+
+        // 查询指定日期范围内的值班记录
+        QueryWrapper<DutyRecord> queryWrapper = new QueryWrapper<>();
+        queryWrapper.ge("dutyDate", startCal.getTime());
+        queryWrapper.le("dutyDate", endCal.getTime());
+        queryWrapper.eq("isDelete", 0);
+        queryWrapper.orderByAsc("dutyDate");
+
+        List<DutyRecord> records = this.list(queryWrapper);
+        
+        return records.stream().map(record -> {
+            DutyRecordVO vo = new DutyRecordVO();
+            BeanUtils.copyProperties(record, vo);
+            // 填充用户信息
+            User user = userMapper.selectById(record.getUserId());
+            if (user != null) {
+                vo.setUserName(user.getUserName());
+                vo.setDept(user.getDept());
+                vo.setPhone(user.getPhone());
+            }
+            return vo;
+        }).collect(Collectors.toList());
     }
 }
 

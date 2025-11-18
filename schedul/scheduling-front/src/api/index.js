@@ -233,6 +233,17 @@ export const generateDutyRecords = (data) => {
   });
 };
 
+/**
+ * 根据日期范围获取值班记录（用于日历显示历史记录）
+ */
+export const getDutyRecordsByDateRange = (startDate, endDate) => {
+  return request({
+    method: "get",
+    url: "duty/record/range",
+    params: { startDate, endDate },
+  });
+};
+
 
 
 

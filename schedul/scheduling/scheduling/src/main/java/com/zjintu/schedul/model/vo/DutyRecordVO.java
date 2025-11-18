@@ -50,6 +50,21 @@ public class DutyRecordVO implements Serializable {
      */
     private Date updateTime;
 
+    /**
+     * 用户名
+     */
+    private String userName;
+
+    /**
+     * 部门
+     */
+    private String dept;
+
+    /**
+     * 手机号
+     */
+    private String phone;
+
     private static final long serialVersionUID = 1L;
 }
 

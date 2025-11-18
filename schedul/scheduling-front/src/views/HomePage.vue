@@ -415,7 +415,8 @@ import {
   deleteDutyPerson,
   getDutyPersonListByDate,
   deleteUser,
-  generateDutyRecords
+  generateDutyRecords,
+  getDutyRecordsByDateRange
 } from '@/api/index'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
@@ -514,6 +515,9 @@ const baseDate = ref(new Date().toISOString().slice(0, 10)) // YYYY-MM-DD
 // 当前添加的周六组类型
 const currentSaturdayGroup = ref('group1')
 
+// 缓存的值班记录数据（用于显示历史值班人员）
+const dutyRecordsCache = ref({})
+
 // 选中的日期信息（用于详情对话框）
 const selectedDayInfo = reactive({
   dateStr: '',
@@ -609,53 +613,70 @@ const createDayData = (date) => {
   today.setHours(0, 0, 0, 0)
   const isToday = date.getTime() === today.getTime()
   const isOtherMonth = false
+  const isPastDate = date < today // 是否为过去的日期
 
   // 计算值班人员
   let dutyPersons = []
   
-  // 检查是否为月末最后两天
-  const isMonthEnd = isMonthEndDay(date)
-  
-  // 如果是月末最后两天，添加月末值班人员
-  if (isMonthEnd) {
-    if (monthEndDutyList.value && Array.isArray(monthEndDutyList.value) && monthEndDutyList.value.length > 0) {
-      dutyPersons = monthEndDutyList.value.map(config => ({
-        id: config.id,
-        userName: config.userName,
-        dept: config.dept || '',
-        phone: config.phone || ''
+  // 对于过去的日期，使用缓存的实际记录；对于今天及未来，使用当前配置
+  if (isPastDate && dutyRecordsCache.value) {
+    // 使用缓存的实际值班记录
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    const recordsForDate = dutyRecordsCache.value[dateStr]
+    if (recordsForDate && recordsForDate.length > 0) {
+      dutyPersons = recordsForDate.map(record => ({
+        id: record.userId,
+        userName: record.userName,
+        dept: record.dept || '',
+        phone: record.phone || ''
       }))
     }
+  } else {
+    // 使用当前配置计算值班人员（今天及未来）
+    // 检查是否为月末最后两天
+    const isMonthEnd = isMonthEndDay(date)
+    
+    // 如果是月末最后两天，添加月末值班人员
+    if (isMonthEnd) {
+      if (monthEndDutyList.value && Array.isArray(monthEndDutyList.value) && monthEndDutyList.value.length > 0) {
+        dutyPersons = monthEndDutyList.value.map(config => ({
+          id: config.id,
+          userName: config.userName,
+          dept: config.dept || '',
+          phone: config.phone || ''
+        }))
+      }
+    }
+    
+    // 周一到周五：添加工作日值班人员（如果也是月末，则合并显示）
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      if (weekdayDutyList.value && Array.isArray(weekdayDutyList.value) && weekdayDutyList.value.length > 0) {
+        const weekdayPersons = weekdayDutyList.value.map(config => ({
+          id: config.id,
+          userName: config.userName,
+          dept: config.dept || '',
+          phone: config.phone || ''
+        }))
+        // 合并月末和工作日值班人员
+        dutyPersons = [...dutyPersons, ...weekdayPersons]
+      }
+    } else if (dayOfWeek === 6) {
+      // 周六：根据单周/双周显示对应组的值班人员（如果也是月末，则合并显示）
+      const isSingle = isSingleWeek(date)
+      const saturdayGroup = isSingle ? saturdayGroup1.value : saturdayGroup2.value
+      if (saturdayGroup && Array.isArray(saturdayGroup) && saturdayGroup.length > 0) {
+        const saturdayPersons = saturdayGroup.map(config => ({
+          id: config.id,
+          userName: config.userName,
+          dept: config.dept || '',
+          phone: config.phone || ''
+        }))
+        // 合并月末和周六值班人员
+        dutyPersons = [...dutyPersons, ...saturdayPersons]
+      }
+    }
+    // 周日只显示月末值班人员（如果是月末的话）
   }
-  
-  // 周一到周五：添加工作日值班人员（如果也是月末，则合并显示）
-  if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-    if (weekdayDutyList.value && Array.isArray(weekdayDutyList.value) && weekdayDutyList.value.length > 0) {
-      const weekdayPersons = weekdayDutyList.value.map(config => ({
-        id: config.id,
-        userName: config.userName,
-        dept: config.dept || '',
-        phone: config.phone || ''
-      }))
-      // 合并月末和工作日值班人员
-      dutyPersons = [...dutyPersons, ...weekdayPersons]
-    }
-  } else if (dayOfWeek === 6) {
-    // 周六：根据单周/双周显示对应组的值班人员（如果也是月末，则合并显示）
-    const isSingle = isSingleWeek(date)
-    const saturdayGroup = isSingle ? saturdayGroup1.value : saturdayGroup2.value
-    if (saturdayGroup && Array.isArray(saturdayGroup) && saturdayGroup.length > 0) {
-      const saturdayPersons = saturdayGroup.map(config => ({
-        id: config.id,
-        userName: config.userName,
-        dept: config.dept || '',
-        phone: config.phone || ''
-      }))
-      // 合并月末和周六值班人员
-      dutyPersons = [...dutyPersons, ...saturdayPersons]
-    }
-  }
-  // 周日只显示月末值班人员（如果是月末的话）
 
   return {
     date,
@@ -672,30 +693,80 @@ const getWeekdayName = (date) => {
 }
 
 // 上一个月
-const prevMonth = () => {
+const prevMonth = async () => {
   const date = new Date(currentDate.value + '-01')
   date.setMonth(date.getMonth() - 1)
   currentDate.value = date.toISOString().slice(0, 7)
-  refreshCalendar()
+  await refreshCalendar()
 }
 
 // 下一个月
-const nextMonth = () => {
+const nextMonth = async () => {
   const date = new Date(currentDate.value + '-01')
   date.setMonth(date.getMonth() + 1)
   currentDate.value = date.toISOString().slice(0, 7)
-  refreshCalendar()
+  await refreshCalendar()
 }
 
 // 月份变化
-const handleMonthChange = () => {
-  refreshCalendar()
+const handleMonthChange = async () => {
+  await refreshCalendar()
 }
 
 // 刷新日历
-const refreshCalendar = () => {
+const refreshCalendar = async () => {
+  // 加载历史值班记录
+  await loadDutyRecords()
   // 重新计算日历数据
   ElMessage.success('日历已刷新')
+}
+
+// 加载当前月份的值班记录
+const loadDutyRecords = async () => {
+  try {
+    const year = parseInt(currentDate.value.split('-')[0])
+    const month = parseInt(currentDate.value.split('-')[1]) - 1
+    
+    // 计算当前月份的开始和结束日期
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    
+    // 只加载过去的记录（今天之前）
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    if (firstDay >= today) {
+      // 如果整个月份都在未来，不需要加载记录
+      dutyRecordsCache.value = {}
+      return
+    }
+    
+    // 如果月份跨越今天，只加载到昨天
+    const endDate = lastDay < today ? lastDay : new Date(today.getTime() - 24 * 60 * 60 * 1000)
+    
+    const startDateStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`
+    const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+    
+    const res = await getDutyRecordsByDateRange(startDateStr, endDateStr)
+    
+    if (res.code === 0 && res.data) {
+      // 将记录按日期分组
+      const recordsMap = {}
+      res.data.forEach(record => {
+        const date = new Date(record.dutyDate)
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        if (!recordsMap[dateStr]) {
+          recordsMap[dateStr] = []
+        }
+        recordsMap[dateStr].push(record)
+      })
+      dutyRecordsCache.value = recordsMap
+      console.log('加载历史值班记录:', Object.keys(recordsMap).length, '天')
+    }
+  } catch (error) {
+    console.error('加载值班记录失败:', error)
+    dutyRecordsCache.value = {}
+  }
 }
 
 // 获取星期名称（根据索引）

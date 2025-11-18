@@ -42,4 +42,12 @@ public interface DutyRecordService extends IService<DutyRecord> {
      * @return 更新的记录数
      */
     Integer updateFutureDutyRecords();
+
+    /**
+     * 根据日期范围获取值班记录
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 值班记录列表
+     */
+    List<DutyRecordVO> getDutyRecordsByDateRange(Date startDate, Date endDate);
 }
