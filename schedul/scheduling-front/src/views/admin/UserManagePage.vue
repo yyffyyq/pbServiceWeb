@@ -77,7 +77,7 @@
             <el-tag type="success">{{ dutyCountMap[row.id]?.year || 0 }} 天</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" align="center" fixed="right">
+        <el-table-column label="操作" width="240" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
               type="primary"
@@ -86,6 +86,14 @@
               @click="handleEdit(row)"
             >
               修改
+            </el-button>
+            <el-button
+              type="success"
+              link
+              :icon="Document"
+              @click="handleShowLog(row)"
+            >
+              日志
             </el-button>
             <el-button
               type="danger"
@@ -183,15 +191,45 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 值班日志对话框 -->
+    <el-dialog
+      v-model="showLogDialog"
+      :title="`${currentLogUser?.userName || '用户'} 的值班日志`"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="log-calendar-container">
+        <el-calendar v-model="logCalendarDate">
+          <template #date-cell="{ data }">
+            <div
+              class="calendar-day"
+              :class="{
+                'duty-day': isDutyDay(data.day),
+                'today': isToday(data.day)
+              }"
+            >
+              <div class="day-number">{{ data.day.split('-').slice(-1)[0] }}</div>
+              <div v-if="isDutyDay(data.day)" class="duty-badge">值班</div>
+            </div>
+          </template>
+        </el-calendar>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showLogDialog = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Delete, Edit, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Delete, Edit, Plus, Document } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { listUserVOByPage, deleteUser, getUserById, addUser, updateUser, getDutyCount as getDutyCountApi } from '@/api/index'
+import { listUserVOByPage, deleteUser, getUserById, addUser, updateUser, getDutyCount as getDutyCountApi, getDutyRecordsByUserId } from '@/api/index'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
 const router = useRouter()
@@ -330,6 +368,12 @@ const formatDate = (dateValue) => {
 
 // 值班天数映射表
 const dutyCountMap = ref({})
+
+// 日志对话框相关
+const showLogDialog = ref(false)
+const currentLogUser = ref(null)
+const logCalendarDate = ref(new Date())
+const dutyRecordDates = ref([])
 
 // 批量获取值班天数（从后端接口）
 const loadDutyCounts = async (userList) => {
@@ -642,6 +686,51 @@ const doDelete = async (id) => {
   }
 }
 
+// 查看值班日志
+const handleShowLog = async (row) => {
+  currentLogUser.value = row
+  logCalendarDate.value = new Date()
+  dutyRecordDates.value = []
+  showLogDialog.value = true
+  
+  try {
+    const res = await getDutyRecordsByUserId(row.id)
+    if (res.code === 0 && res.data) {
+      // 过滤出已经发生的值班日期（不包括未来的日期）
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      dutyRecordDates.value = res.data
+        .filter(record => {
+          const dutyDate = new Date(record.dutyDate)
+          dutyDate.setHours(0, 0, 0, 0)
+          return dutyDate < today // 只显示今天之前的日期
+        })
+        .map(record => {
+          const date = new Date(record.dutyDate)
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        })
+    } else {
+      ElMessage.error('获取值班记录失败')
+    }
+  } catch (error) {
+    console.error('获取值班记录失败:', error)
+    ElMessage.error('获取值班记录失败')
+  }
+}
+
+// 判断是否为值班日期
+const isDutyDay = (dateStr) => {
+  return dutyRecordDates.value.includes(dateStr)
+}
+
+// 判断是否为今天
+const isToday = (dateStr) => {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  return dateStr === todayStr
+}
+
 // 页面加载时请求数据
 onMounted(() => {
   // 先初始化用户信息
@@ -726,6 +815,82 @@ onMounted(() => {
   .page-title {
     font-size: 20px;
   }
+}
+
+/* 日志日历样式 */
+.log-calendar-container {
+  width: 100%;
+}
+
+.calendar-day {
+  width: 100%;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.calendar-day .day-number {
+  font-size: 16px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.calendar-day.today {
+  background-color: #ecf5ff;
+  border: 1px solid #409eff;
+}
+
+.calendar-day.duty-day {
+  background-color: #fff3e0;
+  border: 1px solid #ff9800;
+}
+
+.calendar-day.duty-day .day-number {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+.calendar-day .duty-badge {
+  font-size: 12px;
+  color: #ff9800;
+  background-color: #fff3e0;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.calendar-day:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 自定义日历样式 */
+:deep(.el-calendar-table .el-calendar-day) {
+  padding: 4px;
+  height: 80px;
+}
+
+:deep(.el-calendar-table thead th) {
+  padding: 12px 0;
+  font-weight: 600;
+  color: #303133;
+}
+
+:deep(.el-calendar__header) {
+  padding: 16px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+:deep(.el-calendar__title) {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
 }
 </style>
 
