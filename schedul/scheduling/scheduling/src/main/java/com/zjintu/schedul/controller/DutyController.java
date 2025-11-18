@@ -11,6 +11,7 @@ import com.zjintu.schedul.model.dto.duty.*;
 import com.zjintu.schedul.model.vo.DutyConfigVO;
 import com.zjintu.schedul.model.vo.DutyPersonVO;
 import com.zjintu.schedul.model.vo.DutyCountVO;
+import com.zjintu.schedul.service.DutyRecordService;
 import com.zjintu.schedul.service.DutyService;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +28,9 @@ public class DutyController {
 
     @Resource
     private DutyService dutyService;
+
+    @Resource
+    private DutyRecordService dutyRecordService;
 
     /**
      * 获取值班配置（包括基准日期和所有值班人员列表）
@@ -57,6 +61,13 @@ public class DutyController {
     public BaseResponse<Long> addDutyPerson(@RequestBody DutyPersonAddRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         Long id = dutyService.addDutyPerson(request);
+        // 添加人员后，更新从今天开始的未来值班记录
+        try {
+            dutyRecordService.updateFutureDutyRecords();
+        } catch (Exception e) {
+            // 记录更新失败不影响添加操作
+            e.printStackTrace();
+        }
         return ResultUtils.success(id);
     }
 
@@ -68,6 +79,13 @@ public class DutyController {
     public BaseResponse<Boolean> deleteDutyPerson(@RequestBody DeleteRequest deleteRequest) {
         ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() <= 0, ErrorCode.PARAMS_ERROR);
         Boolean result = dutyService.deleteDutyPerson(deleteRequest.getId());
+        // 删除人员后，更新从今天开始的未来值班记录
+        try {
+            dutyRecordService.updateFutureDutyRecords();
+        } catch (Exception e) {
+            // 记录更新失败不影响删除操作
+            e.printStackTrace();
+        }
         return ResultUtils.success(result);
     }
 

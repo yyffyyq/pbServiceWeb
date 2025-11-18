@@ -1,14 +1,18 @@
 package com.zjintu.schedul.controller;
 
+import com.zjintu.schedul.annotation.AuthCheck;
 import com.zjintu.schedul.common.BaseResponse;
 import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.common.ResultUtils;
+import com.zjintu.schedul.constant.UserConstant;
 import com.zjintu.schedul.exception.ThrowUtils;
 import com.zjintu.schedul.model.vo.DutyRecordVO;
 import com.zjintu.schedul.service.DutyRecordService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -31,6 +35,23 @@ public class DutyRecordController {
         ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
         List<DutyRecordVO> records = dutyRecordService.getDutyRecordsByUserId(userId);
         return ResultUtils.success(records);
+    }
+
+    /**
+     * 生成指定日期范围的值班记录（仅管理员）
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 生成的记录数
+     */
+    @PostMapping("/generate")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Integer> generateDutyRecords(
+            @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
+        ThrowUtils.throwIf(startDate == null || endDate == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(startDate.after(endDate), ErrorCode.PARAMS_ERROR, "开始日期不能晚于结束日期");
+        Integer count = dutyRecordService.generateDutyRecordsForDateRange(startDate, endDate);
+        return ResultUtils.success(count);
     }
 }
 

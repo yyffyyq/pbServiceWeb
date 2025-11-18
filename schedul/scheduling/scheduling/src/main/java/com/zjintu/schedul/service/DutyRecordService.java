@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.zjintu.schedul.model.entity.DutyRecord;
 import com.zjintu.schedul.model.vo.DutyRecordVO;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -20,4 +21,25 @@ public interface DutyRecordService extends IService<DutyRecord> {
      * @return 值班记录列表
      */
     List<DutyRecordVO> getDutyRecordsByUserId(Long userId);
+
+    /**
+     * 生成指定日期的值班记录
+     * @param date 日期
+     * @return 生成的记录数
+     */
+    Integer generateDutyRecordsForDate(Date date);
+
+    /**
+     * 生成指定日期范围的值班记录
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 生成的记录数
+     */
+    Integer generateDutyRecordsForDateRange(Date startDate, Date endDate);
+
+    /**
+     * 更新从今天开始的未来值班记录（用于配置变更后更新未来排班）
+     * @return 更新的记录数
+     */
+    Integer updateFutureDutyRecords();
 }

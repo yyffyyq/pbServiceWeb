@@ -6,14 +6,14 @@
 
     <resultMap id="BaseResultMap" type="com.zjintu.schedul.model.entity.DutyRecord">
             <id property="id" column="id" />
-            <result property="userid" column="userId" />
-            <result property="dutydate" column="dutyDate" />
-            <result property="dutytype" column="dutyType" />
+            <result property="userId" column="userId" />
+            <result property="dutyDate" column="dutyDate" />
+            <result property="dutyType" column="dutyType" />
             <result property="status" column="status" />
             <result property="remark" column="remark" />
-            <result property="createtime" column="createTime" />
-            <result property="updatetime" column="updateTime" />
-            <result property="isdelete" column="isDelete" />
+            <result property="createTime" column="createTime" />
+            <result property="updateTime" column="updateTime" />
+            <result property="isDelete" column="isDelete" />
     </resultMap>
 
     <sql id="Base_Column_List">

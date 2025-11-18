@@ -4,6 +4,7 @@
       <h1 class="page-title">值班安排表</h1>
       <div class="header-actions" v-if="isAdmin">
         <el-button :icon="Setting" @click="showConfigDialog = true">配置管理</el-button>
+        <el-button type="warning" :icon="DocumentAdd" @click="showGenerateDialog = true">生成值班记录</el-button>
       </div>
     </div>
 
@@ -223,14 +224,16 @@
         :rules="personFormRules"
         label-width="100px"
       >
-        <el-form-item label="选择用户" prop="userId">
+        <el-form-item label="选择用户" prop="userIds">
           <el-select
-            v-model="personForm.userId"
-            placeholder="请选择用户"
+            v-model="personForm.userIds"
+            placeholder="请选择用户（可多选）"
+            multiple
             filterable
             style="width: 100%;"
-            @change="handleUserSelect"
             :loading="loadingUserList"
+            collapse-tags
+            collapse-tags-tooltip
           >
             <el-option
               v-for="user in availableUsers"
@@ -255,32 +258,71 @@
             </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item label="姓名">
-          <el-input
-            v-model="personForm.userName"
-            disabled
-            placeholder="选择用户后自动填充"
-          />
-        </el-form-item>
-        <el-form-item label="部门">
-          <el-input
-            v-model="personForm.dept"
-            disabled
-            placeholder="选择用户后自动填充"
-          />
-        </el-form-item>
-        <el-form-item label="手机号">
-          <el-input
-            v-model="personForm.phone"
-            disabled
-            placeholder="选择用户后自动填充"
-          />
+        <el-form-item label="已选人员" v-if="personForm.userIds && personForm.userIds.length > 0">
+          <div class="selected-users-list">
+            <el-tag
+              v-for="userId in personForm.userIds"
+              :key="userId"
+              closable
+              @close="handleRemoveSelectedUser(userId)"
+              style="margin-right: 8px; margin-bottom: 8px;"
+            >
+              {{ getUserNameById(userId) }}
+            </el-tag>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showAddPersonDialog = false">取消</el-button>
           <el-button type="primary" @click="handleSubmitPerson" :loading="submittingPerson">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 生成值班记录对话框 -->
+    <el-dialog
+      v-model="showGenerateDialog"
+      title="生成值班记录"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="generateForm" label-width="100px">
+        <el-form-item label="开始日期">
+          <el-date-picker
+            v-model="generateForm.startDate"
+            type="date"
+            placeholder="选择开始日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="结束日期">
+          <el-date-picker
+            v-model="generateForm.endDate"
+            type="date"
+            placeholder="选择结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-alert
+          title="说明"
+          type="info"
+          :closable="false"
+          style="margin-bottom: 16px;"
+        >
+          <p>此功能用于生成指定日期范围内的值班记录。</p>
+          <p>系统会每天凌晘02:00自动生成当天的值班记录。</p>
+          <p>如果需要补生成历史记录，请手动使用此功能。</p>
+        </el-alert>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showGenerateDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleGenerateRecords" :loading="generatingRecords">生成</el-button>
         </span>
       </template>
     </el-dialog>
@@ -357,7 +399,8 @@ import {
   Edit,
   Calendar,
   Phone,
-  Download // 新增导出图标
+  Download, // 新增导出图标
+  DocumentAdd // 新增生成记录图标
 } from '@element-plus/icons-vue'
 // 引入html2canvas（核心导出依赖）
 import html2canvas from 'html2canvas'
@@ -371,7 +414,8 @@ import {
   addDutyPerson,
   deleteDutyPerson,
   getDutyPersonListByDate,
-  deleteUser
+  deleteUser,
+  generateDutyRecords
 } from '@/api/index'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
@@ -385,6 +429,12 @@ const exportLoading = ref(false) // 导出加载状态
 // 响应式数据
 const currentDate = ref(new Date().toISOString().slice(0, 7)) // YYYY-MM
 const showConfigDialog = ref(false)
+const showGenerateDialog = ref(false)
+const generatingRecords = ref(false)
+const generateForm = reactive({
+  startDate: '',
+  endDate: ''
+})
 
 // 判断是否为管理员
 const isAdmin = computed(() => {
@@ -474,16 +524,14 @@ const selectedDayInfo = reactive({
 
 // 人员表单数据
 const personForm = reactive({
-  userId: null,
-  userName: '',
-  dept: '',
-  phone: ''
+  userIds: []
 })
 
 // 表单验证规则
 const personFormRules = {
-  userId: [
-    { required: true, message: '请选择用户', trigger: 'change' }
+  userIds: [
+    { required: true, message: '请选择用户', trigger: 'change' },
+    { type: 'array', min: 1, message: '请至少选择一个用户', trigger: 'change' }
   ]
 }
 
@@ -565,9 +613,11 @@ const createDayData = (date) => {
   // 计算值班人员
   let dutyPersons = []
   
-  // 首先检查是否为月末最后两天
-  if (isMonthEndDay(date)) {
-    // 月末最后两天：显示月末值班人员
+  // 检查是否为月末最后两天
+  const isMonthEnd = isMonthEndDay(date)
+  
+  // 如果是月末最后两天，添加月末值班人员
+  if (isMonthEnd) {
     if (monthEndDutyList.value && Array.isArray(monthEndDutyList.value) && monthEndDutyList.value.length > 0) {
       dutyPersons = monthEndDutyList.value.map(config => ({
         id: config.id,
@@ -576,30 +626,36 @@ const createDayData = (date) => {
         phone: config.phone || ''
       }))
     }
-  } else if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-    // 周一到周五：显示所有工作日值班人员
+  }
+  
+  // 周一到周五：添加工作日值班人员（如果也是月末，则合并显示）
+  if (dayOfWeek >= 1 && dayOfWeek <= 5) {
     if (weekdayDutyList.value && Array.isArray(weekdayDutyList.value) && weekdayDutyList.value.length > 0) {
-      dutyPersons = weekdayDutyList.value.map(config => ({
+      const weekdayPersons = weekdayDutyList.value.map(config => ({
         id: config.id,
         userName: config.userName,
         dept: config.dept || '',
         phone: config.phone || ''
       }))
+      // 合并月末和工作日值班人员
+      dutyPersons = [...dutyPersons, ...weekdayPersons]
     }
   } else if (dayOfWeek === 6) {
-    // 周六：根据单周/双周显示对应组的值班人员
+    // 周六：根据单周/双周显示对应组的值班人员（如果也是月末，则合并显示）
     const isSingle = isSingleWeek(date)
     const saturdayGroup = isSingle ? saturdayGroup1.value : saturdayGroup2.value
     if (saturdayGroup && Array.isArray(saturdayGroup) && saturdayGroup.length > 0) {
-      dutyPersons = saturdayGroup.map(config => ({
+      const saturdayPersons = saturdayGroup.map(config => ({
         id: config.id,
         userName: config.userName,
         dept: config.dept || '',
         phone: config.phone || ''
       }))
+      // 合并月末和周六值班人员
+      dutyPersons = [...dutyPersons, ...saturdayPersons]
     }
   }
-  // 周日不安排值班
+  // 周日只显示月末值班人员（如果是月末的话）
 
   return {
     date,
@@ -831,31 +887,22 @@ const getUserFullInfo = async (userId) => {
   }
 }
 
-// 用户选择处理
+// 用户选择处理（不再需要，因为改为多选）
 const handleUserSelect = async (userId) => {
-  if (!userId) {
-    Object.assign(personForm, {
-      userName: '',
-      dept: '',
-      phone: ''
-    })
-    return
-  }
+  // 多选模式下不需要单独处理
+}
 
-  // 先从本地用户列表查找
-  const localUser = allUsers.value.find(u => u.id === userId)
-  if (localUser) {
-    // 如果本地有，尝试获取完整信息（包含 phone 和 dept）
-    const fullInfo = await getUserFullInfo(userId)
-    if (fullInfo) {
-      personForm.userName = fullInfo.userName || localUser.userName
-      personForm.dept = fullInfo.dept || ''
-      personForm.phone = fullInfo.phone || ''
-    } else {
-      personForm.userName = localUser.userName
-      personForm.dept = ''
-      personForm.phone = ''
-    }
+// 根据用户ID获取用户名
+const getUserNameById = (userId) => {
+  const user = allUsers.value.find(u => u.id === userId)
+  return user ? user.userName : '未知用户'
+}
+
+// 移除已选用户
+const handleRemoveSelectedUser = (userId) => {
+  const index = personForm.userIds.indexOf(userId)
+  if (index > -1) {
+    personForm.userIds.splice(index, 1)
   }
 }
 
@@ -864,20 +911,13 @@ const handleSubmitPerson = async () => {
   personFormRef.value.validate(async (valid) => {
     if (!valid) return
 
-    if (!personForm.userId) {
+    if (!personForm.userIds || personForm.userIds.length === 0) {
       ElMessage.error('请选择用户')
       return
     }
 
     submittingPerson.value = true
     try {
-      // 获取完整用户信息
-      const fullInfo = await getUserFullInfo(personForm.userId)
-      if (!fullInfo) {
-        ElMessage.error('获取用户信息失败')
-        return
-      }
-
       // 确定值班类型
       let dutyType = 'weekday'
       if (currentSaturdayGroup.value) {
@@ -886,22 +926,45 @@ const handleSubmitPerson = async () => {
         dutyType = 'month_end'
       }
 
-      // 调用后端接口添加值班人员
-      const res = await addDutyPerson({
-        userId: personForm.userId,
-        dutyType: dutyType
-      })
+      // 批量添加值班人员
+      let successCount = 0
+      let failCount = 0
+      const errors = []
 
-      if (res.code === 0) {
-        ElMessage.success('添加成功')
-        // 重新加载配置
-        await loadConfigFromLocal()
-        showAddPersonDialog.value = false
-        resetPersonForm()
-        refreshCalendar()
-      } else {
-        ElMessage.error(res.message || '添加失败')
+      for (const userId of personForm.userIds) {
+        try {
+          const res = await addDutyPerson({
+            userId: userId,
+            dutyType: dutyType
+          })
+
+          if (res.code === 0) {
+            successCount++
+          } else {
+            failCount++
+            const userName = getUserNameById(userId)
+            errors.push(`${userName}: ${res.message || '添加失败'}`)
+          }
+        } catch (error) {
+          failCount++
+          const userName = getUserNameById(userId)
+          errors.push(`${userName}: 添加失败`)
+        }
       }
+
+      // 显示结果
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 个人员`)
+      }
+      if (failCount > 0) {
+        ElMessage.warning(`${failCount} 个人员添加失败${errors.length > 0 ? '\n' + errors.join('\n') : ''}`)
+      }
+
+      // 重新加载配置
+      await loadConfigFromLocal()
+      showAddPersonDialog.value = false
+      resetPersonForm()
+      refreshCalendar()
     } catch (error) {
       console.error('保存值班人员失败:', error)
       ElMessage.error('保存失败')
@@ -914,10 +977,7 @@ const handleSubmitPerson = async () => {
 // 重置人员表单
 const resetPersonForm = () => {
   Object.assign(personForm, {
-    userId: null,
-    userName: '',
-    dept: '',
-    phone: ''
+    userIds: []
   })
   personFormRef.value?.clearValidate()
 }
@@ -1079,6 +1139,44 @@ const exportDetailToPng = async () => {
     ElMessage.error('导出失败，请重试')
   } finally {
     exportLoading.value = false
+  }
+}
+
+// 生成值班记录
+const handleGenerateRecords = async () => {
+  if (!generateForm.startDate || !generateForm.endDate) {
+    ElMessage.warning('请选择开始日期和结束日期')
+    return
+  }
+
+  const startDate = new Date(generateForm.startDate)
+  const endDate = new Date(generateForm.endDate)
+  if (startDate > endDate) {
+    ElMessage.warning('开始日期不能晚于结束日期')
+    return
+  }
+
+  generatingRecords.value = true
+  try {
+    const res = await generateDutyRecords({
+      startDate: generateForm.startDate,
+      endDate: generateForm.endDate
+    })
+
+    if (res.code === 0) {
+      ElMessage.success(`成功生成 ${res.data} 条值班记录`)
+      showGenerateDialog.value = false
+      // 重置表单
+      generateForm.startDate = ''
+      generateForm.endDate = ''
+    } else {
+      ElMessage.error(res.message || '生成失败')
+    }
+  } catch (error) {
+    console.error('生成值班记录失败:', error)
+    ElMessage.error('生成失败')
+  } finally {
+    generatingRecords.value = false
   }
 }
 
@@ -1460,5 +1558,16 @@ onMounted(async () => {
   gap: 8px;
   color: #606266;
   font-size: 14px;
+}
+
+/* 已选用户列表样式 */
+.selected-users-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  min-height: 40px;
 }
 </style>

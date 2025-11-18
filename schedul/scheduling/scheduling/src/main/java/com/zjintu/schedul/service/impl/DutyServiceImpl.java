@@ -173,19 +173,21 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
 
         List<DutyPersonVO> result = new ArrayList<>();
 
-        // 首先检查是否为月末最后两天
-        if (isMonthEndDay(date)) {
+        // 检查是否为月末最后两天
+        boolean isMonthEnd = isMonthEndDay(date);
+        
+        // 如果是月末最后两天，添加月末值班人员
+        if (isMonthEnd) {
             result.addAll(getDutyPersonListByType("month_end"));
-            return result;
         }
 
-        // 周一到周五（2-6）：返回工作日值班人员
+        // 周一到周五（2-6）：添加工作日值班人员
         if (dayOfWeek >= 2 && dayOfWeek <= 6) {
             result.addAll(getDutyPersonListByType("weekday"));
             return result;
         }
 
-        // 周六（7）：根据单周/双周判断
+        // 如果是月末但是周六，还需要添加周六值班人员
         if (dayOfWeek == 7) {
             // 获取基准日期
             QueryWrapper<DutyConfig> configWrapper = new QueryWrapper<>();
@@ -209,7 +211,7 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
             return result;
         }
 
-        // 周日（1）：不安排值班
+        // 周日（1）：只返回月末值班人员（如果是月末的话）
         return result;
     }
 
@@ -332,17 +334,25 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
             // 只统计当前日期之前的日期（不包括今天）
             if (currentDate.before(today)) {
                 int dayOfWeek = currentDate.get(Calendar.DAY_OF_WEEK); // 1-7, 1是周日
+                boolean counted = false;
 
-                // 首先检查是否为月末最后两天
-                if (isMonthEndDay(currentDate.getTime()) && isMonthEndDuty) {
+                // 检查是否为月末最后两天
+                boolean isMonthEndDay = isMonthEndDay(currentDate.getTime());
+                
+                // 如果是月末且用户在月末值班列表中，则计数
+                if (isMonthEndDay && isMonthEndDuty) {
                     count++;
+                    counted = true;
                 }
+                
                 // 周一到周五（2-6）：如果用户在工作日值班列表中，则计数
-                else if (dayOfWeek >= 2 && dayOfWeek <= 6 && isWeekdayDuty) {
+                if (dayOfWeek >= 2 && dayOfWeek <= 6 && isWeekdayDuty) {
                     count++;
+                    counted = true;
                 }
+                
                 // 周六（7）：根据单周/双周判断
-                else if (dayOfWeek == 7) {
+                if (!counted && dayOfWeek == 7) {
                     if (baseDate != null) {
                         boolean isSingle = isSingleWeek(currentDate.getTime(), baseDate);
                         if ((isSingle && isSaturdayGroup1) || (!isSingle && isSaturdayGroup2)) {

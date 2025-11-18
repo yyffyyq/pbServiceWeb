@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 /**
  * 值班配置Mapper
  */
-@Mapper
+
 public interface DutyConfigMapper extends BaseMapper<DutyConfig> {
 }
 

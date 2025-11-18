@@ -12,9 +12,9 @@
             <result property="phone" column="phone" />
             <result property="userPassword" column="userPassword" />
              <result property="userRole" column="userRole" />
-            <result property="createtime" column="createTime" />
-            <result property="updatetime" column="updateTime" />
-            <result property="isdelete" column="isDelete" />
+            <result property="createTime" column="createTime" />
+            <result property="updateTime" column="updateTime" />
+            <result property="isDelete" column="isDelete" />
     </resultMap>
 
     <sql id="Base_Column_List">

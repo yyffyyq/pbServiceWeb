@@ -212,6 +212,27 @@ export const getDutyCount = (data) => {
   });
 };
 
+/**
+ * 根据用户ID获取值班记录列表
+ */
+export const getDutyRecordsByUserId = (userId) => {
+  return request({
+    method: "get",
+    url: `duty/record/list/${userId}`,
+  });
+};
+
+/**
+ * 生成指定日期范围的值班记录（仅管理员）
+ */
+export const generateDutyRecords = (data) => {
+  return request({
+    method: "post",
+    url: "duty/record/generate",
+    params: data,
+  });
+};
+
 
 
 

@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 /**
  * 值班人员Mapper
  */
-@Mapper
+
 public interface DutyPersonMapper extends BaseMapper<DutyPerson> {
 }
 
