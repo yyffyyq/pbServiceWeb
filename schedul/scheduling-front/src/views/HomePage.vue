@@ -357,33 +357,36 @@
       
       <!-- 导出目标容器（添加ref标识，用于截图） -->
       <div ref="exportContainer" class="export-container">
-        <div class="day-detail">
-          <div class="detail-date">
-            <el-icon><Calendar /></el-icon>
-            <span>{{ selectedDayInfo.dateStr }}</span>
-            <el-tag :type="selectedDayInfo.isWeekend ? 'warning' : 'primary'" size="small" style="margin-left: 8px;">
-              {{ selectedDayInfo.weekdayName }}
-            </el-tag>
-          </div>
-          <div class="detail-persons" v-if="selectedDayInfo.dutyPersons && selectedDayInfo.dutyPersons.length > 0">
-            <div
-              v-for="(person, index) in selectedDayInfo.dutyPersons"
-              :key="index"
-              class="person-card"
-            >
-              <div class="person-header">
-                <span class="person-name">{{ person.userName }}</span>
-                <el-tag size="small" type="info">{{ person.dept || '未设置部门' }}</el-tag>
-              </div>
-              <div class="person-info">
-                <div class="info-item">
-                  <el-icon><Phone /></el-icon>
-                  <span>{{ person.phone || '未设置手机号' }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <el-empty v-else description="该日期未安排值班人员" />
+        <div class="duty-table-wrapper">
+          <h2 class="table-title">锦途周末值班表</h2>
+          <table class="duty-export-table">
+            <thead>
+              <tr>
+                <th class="dept-header">部门</th>
+                <th class="date-header">{{ formatDateHeader(selectedDayInfo.dateStr, true) }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-if="selectedDayInfo.dutyPersons && selectedDayInfo.dutyPersons.length > 0">
+                <template v-for="(deptGroup, deptName) in groupByDept(selectedDayInfo.dutyPersons)" :key="deptName">
+                  <tr v-for="(person, index) in deptGroup" :key="person.userName">
+                    <td v-if="index === 0" :rowspan="deptGroup.length" class="dept-cell">
+                      {{ deptName }}
+                    </td>
+                    <td class="person-cell">
+                      <div class="person-info-cell">
+                        <span class="person-name-text">{{ person.userName }}：</span>
+                        <span class="person-phone-text">{{ person.phone || '未设置' }}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </template>
+              <tr v-else>
+                <td colspan="2" class="empty-message">该日期未安排值班人员</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
       
@@ -1227,6 +1230,40 @@ const initUserInfo = () => {
   }
 }
 
+// 新增：根据部门分组
+const groupByDept = (persons) => {
+  const groups = {}
+  persons.forEach(person => {
+    const dept = person.dept || '未设置部门'
+    if (!groups[dept]) {
+      groups[dept] = []
+    }
+    groups[dept].push(person)
+  })
+  return groups
+}
+
+// 新增：格式化日期头（显示周六/周日和日期）
+const formatDateHeader = (dateStr, isSaturday) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const weekday = isSaturday ? '周六' : '周日'
+  return `${weekday}\n（${month}月${day}日）`
+}
+
+// 新增：获取下一天日期
+const getNextDay = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  date.setDate(date.getDate() + 1)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // 新增：导出详情为PNG
 const exportDetailToPng = async () => {
   exportLoading.value = true
@@ -1635,61 +1672,111 @@ onMounted(async () => {
 
 /* 导出容器样式（确保截图完整） */
 .export-container {
-  padding: 20px;
+  padding: 40px;
   background: #ffffff;
   border-radius: 8px;
 }
 
-.detail-date {
+.duty-table-wrapper {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.table-title {
+  text-align: center;
+  font-size: 26px;
+  font-weight: bold;
+  margin-bottom: 30px;
+  color: #000000;
+  letter-spacing: 2px;
+}
+
+.duty-export-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2.5px solid #000000;
+  font-size: 15px;
+  background-color: #ffffff !important;
+}
+
+.duty-export-table th,
+.duty-export-table td {
+  border: 1.5px solid #000000;
+  padding: 14px 12px;
+  text-align: center;
+  background-color: #ffffff !important;
+  color: #000000;
+}
+
+.dept-header {
+  width: 140px;
+  padding: 18px 12px !important;
+  background: #ffffff !important;
+  font-weight: bold;
+  font-size: 15px;
+  text-align: center;
+  vertical-align: middle;
+  color: #000000;
+}
+
+.date-header {
+  width: auto;
+  font-weight: bold;
+  white-space: pre-line;
+  line-height: 1.8;
+  padding: 18px 20px !important;
+  background: #ffffff !important;
+  font-size: 15px;
+  text-align: center;
+  color: #000000;
+}
+
+.dept-cell {
+  font-weight: bold;
+  vertical-align: middle;
+  background-color: #ffffff !important;
+  min-width: 120px;
+  font-size: 15px;
+  color: #000000;
+}
+
+.person-cell {
+  text-align: left;
+  padding: 12px 16px !important;
+  background-color: #ffffff !important;
+  color: #000000;
+}
+
+.person-info-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e4e7ed;
+  justify-content: flex-start;
+}
+
+.person-name-text {
+  font-weight: 500;
+  margin-right: 4px;
+  font-size: 15px;
+  color: #000000;
+}
+
+.person-phone-text {
+  font-weight: normal;
+  font-size: 15px;
+  color: #000000;
+}
+
+.empty-cell {
+  color: #666666;
   font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+  background-color: #ffffff !important;
 }
 
-.detail-persons {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.person-card {
-  padding: 16px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  border: 1px solid #e4e7ed;
-}
-
-.person-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.person-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.person-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #606266;
-  font-size: 14px;
+.empty-message {
+  padding: 24px !important;
+  color: #999999;
+  background-color: #ffffff !important;
 }
 
 /* 已选用户列表样式 */
