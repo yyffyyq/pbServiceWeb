@@ -48,5 +48,12 @@ public interface DutyService {
      * @return 值班天数
      */
     Integer getDutyCount(Long userId, String type);
+
+    /**
+     * 从指定日期开始更新值班配置
+     * @param request 更新请求
+     * @return 更新后开始日期的值班人员列表
+     */
+    List<DutyPersonVO> updateDutyConfigFrom(DutyConfigUpdateFromRequest request);
 }
 

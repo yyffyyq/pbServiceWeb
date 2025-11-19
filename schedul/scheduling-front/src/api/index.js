@@ -242,6 +242,21 @@ export const getDutyRecordsByDateRange = (startDate, endDate) => {
     url: "duty/record/range",
     params: { startDate, endDate },
   });
+}
+
+/**
+ * 从指定日期开始更新值班配置
+ */
+export const updateDutyConfigFrom = (startDate, config, remark) => {
+  return request({
+    method: "post",
+    url: "duty/person/update-from",
+    data: {
+      startDate,
+      config,
+      remark
+    }
+  });
 };
 
 

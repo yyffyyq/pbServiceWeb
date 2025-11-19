@@ -122,5 +122,16 @@ public class DutyController {
         Integer count = dutyService.getDutyCount(request.getUserId(), request.getType());
         return ResultUtils.success(count);
     }
+
+    /**
+     * 从指定日期开始更新值班配置（仅管理员）
+     */
+    @PostMapping("/person/update-from")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<List<DutyPersonVO>> updateDutyConfigFrom(@RequestBody DutyConfigUpdateFromRequest request) {
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+        List<DutyPersonVO> updatedPersons = dutyService.updateDutyConfigFrom(request);
+        return ResultUtils.success(updatedPersons);
+    }
 }
 
