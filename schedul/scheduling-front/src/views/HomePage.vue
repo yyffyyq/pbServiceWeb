@@ -338,7 +338,7 @@
       </template>
     </el-dialog>
 
-    <!-- 查看日期详情对话框（新增导出功能） -->
+    <!-- 查看日期详情对话框（含新导出样式） -->
     <el-dialog
       v-model="showDayDetailDialog"
       title="值班人员详情"
@@ -370,35 +370,41 @@
       
       <!-- 导出目标容器（添加ref标识，用于截图） -->
       <div ref="exportContainer" class="export-container">
-        <div class="day-detail">
-          <div class="detail-date">
-            <el-icon><Calendar /></el-icon>
-            <span>{{ selectedDayInfo.dateStr }}</span>
-            <el-tag :type="selectedDayInfo.isWeekend ? 'warning' : 'primary'" size="small" style="margin-left: 8px;">
-              {{ selectedDayInfo.weekdayName }}
-            </el-tag>
-          </div>
-          <div class="detail-persons" v-if="selectedDayInfo.dutyPersons && selectedDayInfo.dutyPersons.length > 0">
-            <div
-              v-for="(person, index) in selectedDayInfo.dutyPersons"
-              :key="index"
-              class="person-card"
-            >
-              <div class="person-header">
-                <span class="person-name">{{ person.userName }}</span>
-                <el-tag size="small" type="info">{{ person.dept || '未设置部门' }}</el-tag>
-              </div>
-              <div class="person-info">
-                <div class="info-item">
-                  <el-icon><Phone /></el-icon>
-                  <span>{{ person.phone || '未设置手机号' }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <el-empty v-else description="该日期未安排值班人员" />
+         <div class="duty-table-wrapper">
+          <h2 class="table-title">锦途周末值班表</h2>
+          <table class="duty-export-table">
+            <thead>
+              <tr>
+                <th class="dept-header">部门</th>
+                <th class="date-header">{{ formatDateHeader(selectedDayInfo.dateStr, true) }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-if="selectedDayInfo.dutyPersons && selectedDayInfo.dutyPersons.length > 0">
+                <template v-for="(deptGroup, deptName) in groupByDept(selectedDayInfo.dutyPersons)" :key="deptName">
+                  <tr v-for="(person, index) in deptGroup" :key="person.userName">
+                    <td v-if="index === 0" :rowspan="deptGroup.length" class="dept-cell">
+                      {{ deptName }}
+                    </td>
+                    <td class="person-cell">
+                      <div class="person-info-cell">
+                        <span class="person-name-text">{{ person.userName }}：</span>
+                        <span class="person-phone-text">{{ person.phone || '未设置' }}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </template>
+              <tr v-else>
+                <td colspan="2" class="empty-message">该日期未安排值班人员</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
+
+
+
       
       <template #footer>
         <span class="dialog-footer">
@@ -422,10 +428,9 @@ import {
   Edit,
   Calendar,
   Phone,
-  Download, // 新增导出图标
-  DocumentAdd // 新增生成记录图标
+  Download,
+  DocumentAdd
 } from '@element-plus/icons-vue'
-// 引入html2canvas（核心导出依赖）
 import html2canvas from 'html2canvas'
 import {
   listUserVOByPage,
@@ -444,15 +449,15 @@ import {
 } from '@/api/index'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
-// 初始化 Pinia Store
+// Pinia Store
 const loginUserStore = useLoginUserStore()
 
-// 新增：导出相关状态
-const exportContainer = ref(null) // 导出目标容器ref
-const exportLoading = ref(false) // 导出加载状态
+// 导出相关状态
+const exportContainer = ref(null)
+const exportLoading = ref(false)
 
 // 响应式数据
-const currentDate = ref(new Date().toISOString().slice(0, 7)) // YYYY-MM
+const currentDate = ref(new Date().toISOString().slice(0, 7))
 const showConfigDialog = ref(false)
 const showGenerateDialog = ref(false)
 const generatingRecords = ref(false)
@@ -461,13 +466,11 @@ const generateForm = reactive({
   endDate: ''
 })
 
-// 判断是否为管理员
+// 管理员判断
 const isAdmin = computed(() => {
-  // 优先从 store 获取
   if (loginUserStore.loginUser && loginUserStore.loginUser.userRole === 'admin') {
     return true
   }
-  // 如果 store 中没有，从 localStorage 获取
   try {
     const userInfo = localStorage.getItem('userInfo')
     if (userInfo) {
@@ -479,11 +482,12 @@ const isAdmin = computed(() => {
   }
   return false
 })
+
 const showAddPersonDialog = ref(false)
 const showDayDetailDialog = ref(false)
 const addPersonDialogTitle = ref('添加值班人员')
 const personFormRef = ref(null)
-const editIndex = ref(-1) // 编辑模式下的索引
+const editIndex = ref(-1)
 const isEditMode = computed(() => editIndex.value >= 0)
 const loadingUsers = ref(false)
 const loadingUserList = ref(false)
@@ -491,71 +495,50 @@ const submittingPerson = ref(false)
 
 // 用户列表
 const allUsers = ref([])
-// 允许同一用户添加多次，所以不再过滤已配置的用户
-const availableUsers = computed(() => {
-  return allUsers.value
-})
+const availableUsers = computed(() => allUsers.value)
 
-// 检查用户是否已经配置过（用于显示标记）
+// 检查用户是否已配置
 const isUserAlreadyConfigured = (userId) => {
-  // 检查工作日列表
-  if (weekdayDutyList.value.some(config => config.id === userId)) {
-    return true
-  }
-  // 检查周六单周组
-  if (saturdayGroup1.value.some(config => config.id === userId)) {
-    return true
-  }
-  // 检查周六双周组
-  if (saturdayGroup2.value.some(config => config.id === userId)) {
-    return true
-  }
-  // 检查月末值班列表
-  if (monthEndDutyList.value.some(config => config.id === userId)) {
-    return true
-  }
-  return false
+  return weekdayDutyList.value.some(config => config.id === userId) ||
+         saturdayGroup1.value.some(config => config.id === userId) ||
+         saturdayGroup2.value.some(config => config.id === userId) ||
+         monthEndDutyList.value.some(config => config.id === userId)
 }
 
 // 星期标题
 const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
-// 配置管理标签页
+// 配置标签页
 const configTab = ref('weekday')
 
-// 工作日值班人员列表（周一到周五，固定值班）
+// 值班人员列表
 const weekdayDutyList = ref([])
-
-// 周六值班人员：单周组和双周组
-const saturdayGroup1 = ref([]) // 单周组
-const saturdayGroup2 = ref([]) // 双周组
-
-// 月末值班人员列表（每月最后两天）
+const saturdayGroup1 = ref([])
+const saturdayGroup2 = ref([])
 const monthEndDutyList = ref([])
 
-// 基准日期（用于判断单周/双周，该日期所在周为单周）
-const baseDate = ref(new Date().toISOString().slice(0, 10)) // YYYY-MM-DD
-
-// 当前添加的周六组类型
+// 基准日期
+const baseDate = ref(new Date().toISOString().slice(0, 10))
 const currentSaturdayGroup = ref('group1')
 
-// 缓存的值班记录数据（用于显示历史值班人员）
+// 值班记录缓存
 const dutyRecordsCache = ref({})
 
-// 选中的日期信息（用于详情对话框）
+// 选中日期信息
 const selectedDayInfo = reactive({
   dateStr: '',
   weekdayName: '',
   isWeekend: false,
   dutyPersons: [],
-  isEditable: false, // 是否可编辑（周六或月末）
+  isEditable: false,
   isSaturday: false,
   isMonthEnd: false,
-  date: null // 保存Date对象用于编辑
+  date: null
 })
 
 // 人员表单数据
-const personForm = reactive({  userIds: [],
+const personForm = reactive({
+  userIds: [],
   remark: ''
 })
 
@@ -577,14 +560,14 @@ const calendarDays = computed(() => {
   const month = parseInt(currentDate.value.split('-')[1]) - 1
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
-  const firstDayWeek = firstDay.getDay() // 0-6, 0是周日
+  const firstDayWeek = firstDay.getDay()
   const daysInMonth = lastDay.getDate()
   
   const days = []
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // 添加上个月的最后几天（用于填充第一周）
+  // 添加上个月的最后几天
   for (let i = firstDayWeek - 1; i >= 0; i--) {
     const date = new Date(year, month, -i)
     days.push(createDayData(date, true))
@@ -596,8 +579,8 @@ const calendarDays = computed(() => {
     days.push(createDayData(date, false))
   }
 
-  // 添加下个月的前几天（用于填充最后一周，使总数为7的倍数）
-  const remainingDays = 42 - days.length // 6行 x 7天 = 42
+  // 添加下个月的前几天
+  const remainingDays = 42 - days.length
   for (let day = 1; day <= remainingDays; day++) {
     const date = new Date(year, month + 1, day)
     days.push(createDayData(date, true))
@@ -606,21 +589,16 @@ const calendarDays = computed(() => {
   return days
 })
 
-// 判断指定日期是单周还是双周
+// 判断单周/双周
 const isSingleWeek = (date) => {
   if (!baseDate.value) return true
-  
   const base = new Date(baseDate.value)
   base.setHours(0, 0, 0, 0)
   const target = new Date(date)
   target.setHours(0, 0, 0, 0)
-  
-  // 计算两个日期之间的周数差
   const diffTime = target.getTime() - base.getTime()
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
   const diffWeeks = Math.floor(diffDays / 7)
-  
-  // 如果周数差是偶数，则是单周；如果是奇数，则是双周
   return diffWeeks % 2 === 0
 }
 
@@ -629,28 +607,19 @@ const isMonthEndDay = (date) => {
   const year = date.getFullYear()
   const month = date.getMonth()
   const day = date.getDate()
-  
-  // 获取该月的最后一天
   const lastDay = new Date(year, month + 1, 0).getDate()
-  
-  // 判断是否为最后一天或倒数第二天
   return day === lastDay || day === lastDay - 1
 }
 
 // 创建日期数据对象
-// 创建日期数据对象（修复参数传递+强化历史日期逻辑）
 const createDayData = (date, isOtherMonth) => {
   const dayOfWeek = date.getDay()
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 // 周日或周六
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const isToday = date.getTime() === today.getTime()
-  const isPastDate = date < today // 是否为过去的日期（当天之前）
+  const isPastDate = date < today
 
-  // 计算值班人员
-  let dutyPersons = []
-  
-  // 关键强化：过去的日期（当天之前）仅使用缓存记录，不依赖新配置
   const formatDate = (date) => {
     const y = date.getFullYear()
     const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -660,20 +629,15 @@ const createDayData = (date, isOtherMonth) => {
   const dateStr = formatDate(date)
   const recordsForDate = dutyRecordsCache.value ? dutyRecordsCache.value[dateStr] : null
   
+  let dutyPersons = []
   if (isPastDate) {
-    // 过去的日期：有缓存用缓存，无缓存则显示“未安排”（不使用新配置）
-    if (recordsForDate && recordsForDate.length > 0) {
-      dutyPersons = recordsForDate.map(record => ({
-        id: record.userId,
-        userName: record.userName,
-        dept: record.dept || '',
-        phone: record.phone || ''
-      }))
-    } else {
-      dutyPersons = [] // 历史日期无记录，保持“未安排”
-    }
+    dutyPersons = recordsForDate?.map(record => ({
+      id: record.userId,
+      userName: record.userName,
+      dept: record.dept || '',
+      phone: record.phone || ''
+    })) || []
   } else {
-    // 当天及之后的日期：按原逻辑（缓存优先，无缓存用新配置）
     if (recordsForDate && recordsForDate.length > 0) {
       dutyPersons = recordsForDate.map(record => ({
         id: record.userId,
@@ -682,7 +646,6 @@ const createDayData = (date, isOtherMonth) => {
         phone: record.phone || ''
       }))
     } else {
-      // 缓存中无记录，使用新配置计算
       const isMonthEnd = isMonthEndDay(date)
       if (isMonthEnd) {
         dutyPersons = monthEndDutyList.value.map(config => ({
@@ -716,20 +679,18 @@ const createDayData = (date, isOtherMonth) => {
 
   return {
     date,
-    isOtherMonth, // 修复：正确返回isOtherMonth参数
+    isOtherMonth,
     isWeekend,
     isToday,
-    isPastDate, // 新增：返回是否为过去日期（方便调试）
+    isPastDate,
     dutyPersons
   }
 }
 
 // 获取星期名称
-const getWeekdayName = (date) => {
-  return weekdays[date.getDay()]
-}
+const getWeekdayName = (date) => weekdays[date.getDay()]
 
-// 上一个月
+// 月份切换
 const prevMonth = async () => {
   const date = new Date(currentDate.value + '-01')
   date.setMonth(date.getMonth() - 1)
@@ -737,7 +698,6 @@ const prevMonth = async () => {
   await refreshCalendar()
 }
 
-// 下一个月
 const nextMonth = async () => {
   const date = new Date(currentDate.value + '-01')
   date.setMonth(date.getMonth() + 1)
@@ -745,52 +705,41 @@ const nextMonth = async () => {
   await refreshCalendar()
 }
 
-// 月份变化
 const handleMonthChange = async () => {
   await refreshCalendar()
 }
 
 // 刷新日历
 const refreshCalendar = async (showMessage = true) => {
-  // 加载历史值班记录
   await loadDutyRecords()
-  // 重新计算日历数据
   if (showMessage) {
     ElMessage.success('日历已刷新')
   }
 }
 
-// 加载当前月份的值班记录
-// 加载当前月份的值班记录（修复日期格式匹配bug）
+// 加载值班记录
 const loadDutyRecords = async () => {
   try {
     const year = parseInt(currentDate.value.split('-')[0])
     const month = parseInt(currentDate.value.split('-')[1]) - 1
-    
-    // 计算当前月份的开始和结束日期
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
     
-    // 工具函数：格式化日期为 YYYY-MM-DD（与后端返回格式一致）
     const formatDate = (date) => {
       const y = date.getFullYear()
       const m = String(date.getMonth() + 1).padStart(2, '0')
       const d = String(date.getDate()).padStart(2, '0')
       return `${y}-${m}-${d}`
     }
-    
-    // 修复：使用格式化后的日期字符串，确保与后端返回的dutyDate格式匹配
     const startDateStr = formatDate(firstDay)
     const endDateStr = formatDate(lastDay)
     
     const res = await getDutyRecordsByDateRange(startDateStr, endDateStr)
-    
     if (res.code === 0 && res.data) {
-      // 将记录按日期分组（使用统一格式化的日期字符串作为key）
       const recordsMap = {}
       res.data.forEach(record => {
         const date = new Date(record.dutyDate)
-        const dateStr = formatDate(date) // 修复：统一key格式
+        const dateStr = formatDate(date)
         if (!recordsMap[dateStr]) {
           recordsMap[dateStr] = []
         }
@@ -798,50 +747,30 @@ const loadDutyRecords = async () => {
       })
       dutyRecordsCache.value = recordsMap
       console.log('加载历史值班记录:', Object.keys(recordsMap).length, '天')
-      
-      // 调试日志：打印历史记录的日期范围
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const pastDates = Object.keys(recordsMap).filter(dateStr => new Date(dateStr) < today)
-      console.log('其中历史记录（当天之前）:', pastDates.length, '天')
     }
   } catch (error) {
     console.error('加载值班记录失败:', error)
     dutyRecordsCache.value = {}
   }
 }
-// 获取星期名称（根据索引）
-const getWeekdayNameByIndex = (dayIndex) => {
-  return weekdays[dayIndex]
-}
-
-// 编辑模式标识和相关数据
-const dateEditMode = ref(false)
-const editStartDate = ref(null)
-const editDutyType = ref(null)
 
 // 点击日期
 const handleDayClick = (day) => {
   if (day.isOtherMonth) return
-  
-  // 格式化日期字符串
   const year = day.date.getFullYear()
   const month = String(day.date.getMonth() + 1).padStart(2, '0')
   const date = String(day.date.getDate()).padStart(2, '0')
   const dateStr = `${year}-${month}-${date}`
-  
-  // 判断是否为周六或月底前两天
   const isSaturday = day.date.getDay() === 6
   const monthLastDay = new Date(year, month, 0).getDate()
   const isMonthEnd = date >= monthLastDay - 1
   
-  // 显示详情对话框（所有日期都显示详情）
   Object.assign(selectedDayInfo, {
     dateStr: dateStr,
     weekdayName: getWeekdayName(day.date),
     isWeekend: day.isWeekend,
     dutyPersons: day.dutyPersons || [],
-    isEditable: isSaturday || isMonthEnd, // 周六或月末可编辑
+    isEditable: isSaturday || isMonthEnd,
     isSaturday: isSaturday,
     isMonthEnd: isMonthEnd,
     date: day.date
@@ -850,39 +779,33 @@ const handleDayClick = (day) => {
   showDayDetailDialog.value = true
 }
 
-// 编辑当天的值班人员（从详情对话框中点击编辑按钮）
+// 编辑当天排班
 const handleEditDayDuty = () => {
-  // 关闭详情对话框
   showDayDetailDialog.value = false
-  
-  // 进入编辑模式
   dateEditMode.value = true
   editStartDate.value = selectedDayInfo.dateStr
   
-  // 根据日期类型确定编辑的值班组
   if (selectedDayInfo.isSaturday) {
-    // 使用和日历显示相同的单双周判断逻辑
     const isSingle = isSingleWeek(selectedDayInfo.date)
     editDutyType.value = isSingle ? 'saturday_group1' : 'saturday_group2'
-    
-    // 加载当前值班人员到表单
     personForm.userIds = selectedDayInfo.dutyPersons.map(person => person.id)
   } else if (selectedDayInfo.isMonthEnd) {
-    // 月末值班
     editDutyType.value = 'monthEnd'
-    
-    // 加载当前值班人员到表单
     personForm.userIds = selectedDayInfo.dutyPersons.map(person => person.id)
   }
   
-  // 打开添加人员对话框
   addPersonDialogTitle.value = selectedDayInfo.isSaturday 
     ? `编辑${selectedDayInfo.dateStr}（周六）值班人员` 
     : `编辑${selectedDayInfo.dateStr}（月末）值班人员`
   showAddPersonDialog.value = true
 }
 
-// 添加工作日值班人员
+// 编辑模式标识
+const dateEditMode = ref(false)
+const editStartDate = ref(null)
+const editDutyType = ref(null)
+
+// 添加/编辑值班人员
 const handleAddWeekdayDuty = () => {
   currentSaturdayGroup.value = null
   addPersonDialogTitle.value = '添加工作日值班人员'
@@ -890,7 +813,6 @@ const handleAddWeekdayDuty = () => {
   showAddPersonDialog.value = true
 }
 
-// 添加周六值班人员
 const handleAddSaturdayDuty = (group) => {
   currentSaturdayGroup.value = group
   addPersonDialogTitle.value = `添加周六${group === 'group1' ? '单周' : '双周'}组值班人员`
@@ -898,95 +820,6 @@ const handleAddSaturdayDuty = (group) => {
   showAddPersonDialog.value = true
 }
 
-// 删除工作日值班人员
-const handleRemoveWeekdayDuty = async (index) => {
-  const person = weekdayDutyList.value[index]
-  
-  // 弹出备注输入框
-  ElMessageBox.prompt('请输入删除该值班人员的原因（调班备注）', '删除确认', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputPlaceholder: '请输入调班原因',
-    inputValidator: (value) => {
-      if (!value || value.trim().length < 2) {
-        return '备注至少需要2个字符'
-      }
-      if (value.length > 200) {
-        return '备注长度不能超过200个字符'
-      }
-      return true
-    },
-    inputErrorMessage: '请输入有效的备注'
-  }).then(async ({ value: remark }) => {
-    if (person.dutyPersonId) {
-      try {
-        const res = await deleteDutyPerson({ 
-          id: person.dutyPersonId,
-          remark: remark
-        })
-        if (res.code === 0) {
-          ElMessage.success('删除成功')
-          // 重新加载配置
-          await loadConfigFromLocal()
-          refreshCalendar()
-        } else {
-          ElMessage.error(res.message || '删除失败')
-        }
-      } catch (error) {
-        console.error('删除失败:', error)
-        ElMessage.error('删除失败')
-      }
-    } else {
-      ElMessage.error('无法获取值班人员ID')
-    }
-  }).catch(() => {})
-}
-
-// 删除周六值班人员
-const handleRemoveSaturdayDuty = async (group, index) => {
-  const person = group === 'group1' ? saturdayGroup1.value[index] : saturdayGroup2.value[index]
-  
-  // 弹出备注输入框
-  ElMessageBox.prompt('请输入删除该值班人员的原因（调班备注）', '删除确认', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputPlaceholder: '请输入调班原因',
-    inputValidator: (value) => {
-      if (!value || value.trim().length < 2) {
-        return '备注至少需要2个字符'
-      }
-      if (value.length > 200) {
-        return '备注长度不能超过200个字符'
-      }
-      return true
-    },
-    inputErrorMessage: '请输入有效的备注'
-  }).then(async ({ value: remark }) => {
-    if (person.dutyPersonId) {
-      try {
-        const res = await deleteDutyPerson({ 
-          id: person.dutyPersonId,
-          remark: remark
-        })
-        if (res.code === 0) {
-          ElMessage.success('删除成功')
-          // 重新加载配置
-          await loadConfigFromLocal()
-          refreshCalendar()
-        } else {
-          ElMessage.error(res.message || '删除失败')
-        }
-      } catch (error) {
-        console.error('删除失败:', error)
-        ElMessage.error('删除失败')
-      }
-    } else {
-      ElMessage.error('无法获取值班人员ID')
-    }
-  }).catch(() => {})
-}
-
-// 添加月末值班人员
 const handleAddMonthEndDuty = () => {
   currentSaturdayGroup.value = null
   addPersonDialogTitle.value = '添加月末值班人员'
@@ -994,43 +827,27 @@ const handleAddMonthEndDuty = () => {
   showAddPersonDialog.value = true
 }
 
-// 删除月末值班人员
-const handleRemoveMonthEndDuty = async (index) => {
-  const person = monthEndDutyList.value[index]
-  
-  // 弹出备注输入框
-  ElMessageBox.prompt('请输入删除该值班人员的原因（调班备注）', '删除确认', {
+// 删除值班人员
+const handleRemoveWeekdayDuty = async (index) => {
+  const person = weekdayDutyList.value[index]
+  ElMessageBox.prompt('请输入删除原因', '删除确认', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     inputPlaceholder: '请输入调班原因',
     inputValidator: (value) => {
-      if (!value || value.trim().length < 2) {
-        return '备注至少需要2个字符'
-      }
-      if (value.length > 200) {
-        return '备注长度不能超过200个字符'
-      }
+      if (!value || value.trim().length < 2) return '备注至少需要2个字符'
+      if (value.length > 200) return '备注长度不能超过200个字符'
       return true
     },
-    inputErrorMessage: '请输入有效的备注'
   }).then(async ({ value: remark }) => {
     if (person.dutyPersonId) {
-      try {
-        const res = await deleteDutyPerson({ 
-          id: person.dutyPersonId,
-          remark: remark
-        })
-        if (res.code === 0) {
-          ElMessage.success('删除成功')
-          // 重新加载配置
-          await loadConfigFromLocal()
-          refreshCalendar()
-        } else {
-          ElMessage.error(res.message || '删除失败')
-        }
-      } catch (error) {
-        console.error('删除失败:', error)
-        ElMessage.error('删除失败')
+      const res = await deleteDutyPerson({ id: person.dutyPersonId, remark })
+      if (res.code === 0) {
+        ElMessage.success('删除成功')
+        await loadConfigFromLocal()
+        refreshCalendar()
+      } else {
+        ElMessage.error(res.message || '删除失败')
       }
     } else {
       ElMessage.error('无法获取值班人员ID')
@@ -1038,63 +855,77 @@ const handleRemoveMonthEndDuty = async (index) => {
   }).catch(() => {})
 }
 
-// 加载用户列表（仅管理员）
-const loadUserList = async () => {
-  // 检查是否为管理员
-  if (!isAdmin.value) {
-    console.warn('非管理员用户无法加载用户列表')
-    return
-  }
+const handleRemoveSaturdayDuty = async (group, index) => {
+  const person = group === 'group1' ? saturdayGroup1.value[index] : saturdayGroup2.value[index]
+  ElMessageBox.prompt('请输入删除原因', '删除确认', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPlaceholder: '请输入调班原因',
+    inputValidator: (value) => {
+      if (!value || value.trim().length < 2) return '备注至少需要2个字符'
+      if (value.length > 200) return '备注长度不能超过200个字符'
+      return true
+    },
+  }).then(async ({ value: remark }) => {
+    if (person.dutyPersonId) {
+      const res = await deleteDutyPerson({ id: person.dutyPersonId, remark })
+      if (res.code === 0) {
+        ElMessage.success('删除成功')
+        await loadConfigFromLocal()
+        refreshCalendar()
+      } else {
+        ElMessage.error(res.message || '删除失败')
+      }
+    } else {
+      ElMessage.error('无法获取值班人员ID')
+    }
+  }).catch(() => {})
+}
 
+const handleRemoveMonthEndDuty = async (index) => {
+  const person = monthEndDutyList.value[index]
+  ElMessageBox.prompt('请输入删除原因', '删除确认', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPlaceholder: '请输入调班原因',
+    inputValidator: (value) => {
+      if (!value || value.trim().length < 2) return '备注至少需要2个字符'
+      if (value.length > 200) return '备注长度不能超过200个字符'
+      return true
+    },
+  }).then(async ({ value: remark }) => {
+    if (person.dutyPersonId) {
+      const res = await deleteDutyPerson({ id: person.dutyPersonId, remark })
+      if (res.code === 0) {
+        ElMessage.success('删除成功')
+        await loadConfigFromLocal()
+        refreshCalendar()
+      } else {
+        ElMessage.error(res.message || '删除失败')
+      }
+    } else {
+      ElMessage.error('无法获取值班人员ID')
+    }
+  }).catch(() => {})
+}
+
+// 加载用户列表
+const loadUserList = async () => {
+  if (!isAdmin.value) return
   loadingUserList.value = true
   try {
-    const res = await listUserVOByPage({
-      current: 1,
-      pageSize: 1000 // 获取所有用户
-    })
+    const res = await listUserVOByPage({ current: 1, pageSize: 1000 })
     if (res.code === 0 && res.data) {
       allUsers.value = res.data.records || []
     }
   } catch (error) {
     console.error('加载用户列表失败:', error)
-    // 如果是权限错误，不显示错误提示（因为只有管理员才能看到配置对话框）
-    if (error.response?.status === 403 || error.response?.data?.code === 40300) {
-      console.warn('权限不足，无法加载用户列表')
-    } else {
+    if (error.response?.status !== 403) {
       ElMessage.error('加载用户列表失败')
     }
   } finally {
     loadingUserList.value = false
   }
-}
-
-// 根据用户ID获取完整用户信息（仅管理员）
-const getUserFullInfo = async (userId) => {
-  // 检查是否为管理员
-  if (!isAdmin.value) {
-    console.warn('非管理员用户无法获取完整用户信息')
-    return null
-  }
-
-  try {
-    const res = await getUserById(userId)
-    if (res.code === 0 && res.data) {
-      return res.data
-    }
-    return null
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-    // 如果是权限错误，静默处理（因为只有管理员才能看到配置对话框）
-    if (error.response?.status === 403 || error.response?.data?.code === 40300) {
-      console.warn('权限不足，无法获取用户完整信息')
-    }
-    return null
-  }
-}
-
-// 用户选择处理（不再需要，因为改为多选）
-const handleUserSelect = async (userId) => {
-  // 多选模式下不需要单独处理
 }
 
 // 根据用户ID获取用户名
@@ -1112,171 +943,82 @@ const handleRemoveSelectedUser = (userId) => {
 }
 
 // 提交人员表单
-// 提交人员表单（强化编辑后缓存刷新逻辑）
 const handleSubmitPerson = async () => {
   personFormRef.value.validate(async (valid) => {
     if (!valid) return
-
     if (!personForm.userIds || personForm.userIds.length === 0) {
       ElMessage.error('请选择用户')
       return
     }
-
     submittingPerson.value = true
     try {
       if (dateEditMode.value) {
-        // 编辑模式：更新起始日期之后的排班人员
         let dutyType = editDutyType.value
         let updateConfig = null
-        
         if (dutyType.includes('saturday')) {
-          // 更新周六值班组
+          const newPersons = personForm.userIds.map((userId) => {
+            const user = allUsers.value.find(u => u.id === userId)
+            return user ? { id: user.id, userName: user.userName, dept: user.dept, phone: user.phone } : null
+          }).filter(Boolean)
           if (dutyType === 'saturday_group1') {
-            // 获取选中用户的完整信息
-            const newPersons = personForm.userIds.map((userId) => {
-              const user = allUsers.value.find(u => u.id === userId)
-              if (user) {
-                return {
-                  id: user.id,
-                  userName: user.userName,
-                  dept: user.dept,
-                  phone: user.phone
-                }
-              }
-              return null
-            }).filter(Boolean)
-            
-            // 更新单周组
             saturdayGroup1.value = newPersons
             updateConfig = { saturdayGroup1: newPersons }
           } else {
-            // 获取选中用户的完整信息
-            const newPersons = personForm.userIds.map((userId) => {
-              const user = allUsers.value.find(u => u.id === userId)
-              if (user) {
-                return {
-                  id: user.id,
-                  userName: user.userName,
-                  dept: user.dept,
-                  phone: user.phone
-                }
-              }
-              return null
-            }).filter(Boolean)
-            
-            // 更新双周组
             saturdayGroup2.value = newPersons
             updateConfig = { saturdayGroup2: newPersons }
           }
         } else if (dutyType === 'monthEnd') {
-          // 更新月末值班组
           const newPersons = personForm.userIds.map((userId) => {
             const user = allUsers.value.find(u => u.id === userId)
-            if (user) {
-              return {
-                id: user.id,
-                userName: user.userName,
-                dept: user.dept,
-                phone: user.phone
-              }
-            }
-            return null
+            return user ? { id: user.id, userName: user.userName, dept: user.dept, phone: user.phone } : null
           }).filter(Boolean)
-          
-          // 更新月末值班组
           monthEndDutyList.value = newPersons
           updateConfig = { monthEndDutyList: newPersons }
         }
-        
         if (updateConfig) {
-          // 保存更新后的配置
-          const res = await updateDutyConfigFrom(editStartDate.value, updateConfig, personForm.remark)
-          
-          if (res.code === 0 && res.data) {
-            console.log('排班人员更新成功，返回数据:', res.data)
-            ElMessage.success(`排班人员更新成功，当天${res.data.length}人值班`)
-          } else {
-            console.log('排班人员更新成功')
-            ElMessage.success('排班人员更新成功')
-          }
+          await updateDutyConfigFrom(editStartDate.value, updateConfig, personForm.remark)
+          ElMessage.success('排班人员更新成功')
         }
-        
-        // 重置编辑模式
         dateEditMode.value = false
         editStartDate.value = null
         editDutyType.value = null
       } else {
-        // 普通添加模式
-        // 确定值班类型
         let dutyType = 'weekday'
         if (currentSaturdayGroup.value) {
           dutyType = currentSaturdayGroup.value === 'group1' ? 'saturday_group1' : 'saturday_group2'
         } else if (addPersonDialogTitle.value.includes('月末')) {
           dutyType = 'month_end'
         }
-
-        // 批量添加值班人员
         let successCount = 0
         let failCount = 0
         const errors = []
-
         for (const userId of personForm.userIds) {
           try {
-            const res = await addDutyPerson({
-              userId: userId,
-              dutyType: dutyType,
-              remark: personForm.remark
-            })
-
-            if (res.code === 0) {
-              successCount++
-            } else {
+            const res = await addDutyPerson({ userId, dutyType, remark: personForm.remark })
+            if (res.code === 0) successCount++
+            else {
               failCount++
-              const userName = getUserNameById(userId)
-              errors.push(`${userName}: ${res.message || '添加失败'}`)
+              errors.push(`${getUserNameById(userId)}: ${res.message || '添加失败'}`)
             }
           } catch (error) {
             failCount++
-            const userName = getUserNameById(userId)
-            errors.push(`${userName}: 添加失败`)
+            errors.push(`${getUserNameById(userId)}: 添加失败`)
           }
         }
-
-        // 显示结果
-        if (successCount > 0) {
-          ElMessage.success(`成功添加 ${successCount} 个人员`)
-        }
-        if (failCount > 0) {
-          ElMessage.warning(`${failCount} 个人员添加失败${errors.length > 0 ? '\n' + errors.join('\n') : ''}`)
-        }
+        if (successCount > 0) ElMessage.success(`成功添加 ${successCount} 个人员`)
+        if (failCount > 0) ElMessage.warning(`${failCount} 个人员添加失败${errors.length > 0 ? '\n' + errors.join('\n') : ''}`)
       }
-
-      // 如果是日期编辑模式，不重新加载全局配置（避免覆盖缓存优先级）
-      console.log('日期编辑模式:', dateEditMode.value, '是否重新加载全局配置:', !dateEditMode.value)
-      if (!dateEditMode.value) {
-        await loadConfigFromLocal()
-      }
+      if (!dateEditMode.value) await loadConfigFromLocal()
       showAddPersonDialog.value = false
       resetPersonForm()
-      
-      // 重置编辑模式
       dateEditMode.value = false
       editStartDate.value = null
       editDutyType.value = null
-      
-      // 修复：重新加载值班记录，确保历史记录不丢失
       await refreshCalendar(false)
-      
-      // 调试日志：确认编辑后历史记录仍存在
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      const pastDateCount = Object.keys(dutyRecordsCache.value || {}).filter(dateStr => {
-        return new Date(dateStr) < today
-      }).length
+      const pastDateCount = Object.keys(dutyRecordsCache.value || {}).filter(dateStr => new Date(dateStr) < today).length
       console.log('编辑后保留的历史记录天数:', pastDateCount)
-      if (pastDateCount === 0) {
-        console.warn('警告：未加载到历史值班记录，请检查接口返回')
-      }
     } catch (error) {
       console.error('处理值班人员失败:', error)
       ElMessage.error(isEditMode.value ? '更新值班人员失败' : '添加值班人员失败')
@@ -1288,80 +1030,47 @@ const handleSubmitPerson = async () => {
 
 // 重置人员表单
 const resetPersonForm = () => {
-  Object.assign(personForm, {
-    userIds: [],
-    remark: ''
-  })
+  Object.assign(personForm, { userIds: [], remark: '' })
   personFormRef.value?.clearValidate()
 }
 
 // 处理基准日期变更
 const handleBaseDateChange = async (newDate) => {
   if (newDate) {
-    try {
-      // 保存基准日期到后端
-      const res = await saveBaseDate({ baseDate: newDate })
-      if (res.code === 0) {
-        ElMessage.success('基准日期保存成功')
-        console.log('保存基准日期成功')
-        // 刷新日历，确保单双周判断使用新的基准日期
-        await refreshCalendar()
-      }
-    } catch (error) {
-      console.error('保存基准日期失败:', error)
-      ElMessage.error('基准日期保存失败')
+    const res = await saveBaseDate({ baseDate: newDate })
+    if (res.code === 0) {
+      ElMessage.success('基准日期保存成功')
+      await refreshCalendar()
     }
   }
 }
 
-// 保存基准日期到后端
+// 保存配置
 const saveConfigToLocal = async () => {
   try {
     if (baseDate.value) {
-      const res = await saveBaseDate({ baseDate: baseDate.value })
-      if (res.code === 0) {
-        console.log('保存基准日期成功')
-      }
+      await saveBaseDate({ baseDate: baseDate.value })
     }
   } catch (error) {
     console.error('保存基准日期失败:', error)
   }
 }
 
-// 从后端加载配置
+// 加载配置
 const loadConfigFromLocal = async () => {
   try {
     const res = await getDutyConfig()
     if (res.code === 0 && res.data) {
       const config = res.data
-      console.log('加载值班配置:', config)
-      
-      // 加载工作日值班人员
       weekdayDutyList.value = config.weekdayDutyList || []
-      console.log('工作日值班人员:', weekdayDutyList.value.length, '人')
-      
-      // 加载周六单周组
       saturdayGroup1.value = config.saturdayGroup1 || []
-      console.log('周六单周组:', saturdayGroup1.value.length, '人')
-      
-      // 加载周六双周组
       saturdayGroup2.value = config.saturdayGroup2 || []
-      console.log('周六双周组:', saturdayGroup2.value.length, '人')
-      
-      // 加载月末值班人员
       monthEndDutyList.value = config.monthEndDutyList || []
-      console.log('月末值班人员:', monthEndDutyList.value.length, '人')
-      
-      // 加载基准日期
       if (config.baseDate) {
-        // 将日期字符串转换为 YYYY-MM-DD 格式
         const date = new Date(config.baseDate)
         baseDate.value = date.toISOString().slice(0, 10)
-        console.log('基准日期:', baseDate.value)
       }
     } else {
-      console.log('未找到值班配置')
-      // 初始化空数组
       weekdayDutyList.value = []
       saturdayGroup1.value = []
       saturdayGroup2.value = []
@@ -1369,15 +1078,9 @@ const loadConfigFromLocal = async () => {
     }
   } catch (error) {
     console.error('加载配置失败:', error)
-    // 确保即使出错也初始化空数组
-    weekdayDutyList.value = weekdayDutyList.value || []
-    saturdayGroup1.value = saturdayGroup1.value || []
-    saturdayGroup2.value = saturdayGroup2.value || []
-    monthEndDutyList.value = monthEndDutyList.value || []
   }
 }
 
-// 保存配置
 const handleSaveConfig = async () => {
   try {
     await saveConfigToLocal()
@@ -1390,115 +1093,27 @@ const handleSaveConfig = async () => {
   }
 }
 
-// 删除值班人员
-const handleRemoveDutyPerson = (index) => {
-  ElMessageBox.confirm('确定要删除该值班人员吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    dutyConfigList.value.splice(index, 1)
-    saveConfigToLocal()
-    ElMessage.success('删除成功')
-    refreshCalendar()
-  }).catch(() => {})
-}
-
-// 监听配置对话框打开，加载用户列表（仅管理员）
-watch(showConfigDialog, (newVal) => {
-  if (newVal && isAdmin.value && allUsers.value.length === 0) {
-    loadUserList()
-  }
-})
-
-// 初始化用户信息到 store
-const initUserInfo = () => {
-  try {
-    const userInfo = localStorage.getItem('userInfo')
-    if (userInfo) {
-      const user = JSON.parse(userInfo)
-      // 如果 store 中没有用户信息，从 localStorage 同步
-      if (!loginUserStore.loginUser.id) {
-        loginUserStore.setLoginUser(user)
-      }
-    }
-  } catch (error) {
-    console.error('初始化用户信息失败:', error)
-  }
-}
-
-// 新增：导出详情为PNG
-const exportDetailToPng = async () => {
-  exportLoading.value = true
-  try {
-    // 等待DOM更新完成
-    await nextTick()
-    
-    // 获取导出容器
-    const container = exportContainer.value
-    if (!container) {
-      ElMessage.error('导出容器不存在')
-      return
-    }
-
-    // 配置html2canvas（高清导出）
-    const canvas = await html2canvas(container, {
-      scale: 2, // 缩放比例，2倍高清
-      useCORS: true, // 允许跨域图片
-      logging: false, // 关闭日志
-      width: container.offsetWidth,
-      height: container.offsetHeight,
-      windowWidth: container.scrollWidth,
-      windowHeight: container.scrollHeight,
-      backgroundColor: '#ffffff' // 背景色（避免透明）
-    })
-
-    // 转换为Blob并下载
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    
-    // 文件名：值班详情_日期.png
-    a.download = `值班详情_${selectedDayInfo.dateStr}.png`
-    a.href = url
-    a.click()
-    
-    // 释放URL对象
-    URL.revokeObjectURL(url)
-    ElMessage.success('导出成功！')
-  } catch (error) {
-    console.error('导出PNG失败:', error)
-    ElMessage.error('导出失败，请重试')
-  } finally {
-    exportLoading.value = false
-  }
-}
-
 // 生成值班记录
 const handleGenerateRecords = async () => {
   if (!generateForm.startDate || !generateForm.endDate) {
     ElMessage.warning('请选择开始日期和结束日期')
     return
   }
-
   const startDate = new Date(generateForm.startDate)
   const endDate = new Date(generateForm.endDate)
   if (startDate > endDate) {
     ElMessage.warning('开始日期不能晚于结束日期')
     return
   }
-
   generatingRecords.value = true
   try {
     const res = await generateDutyRecords({
       startDate: generateForm.startDate,
       endDate: generateForm.endDate
     })
-
     if (res.code === 0) {
       ElMessage.success(`成功生成 ${res.data} 条值班记录`)
       showGenerateDialog.value = false
-      // 重置表单
       generateForm.startDate = ''
       generateForm.endDate = ''
     } else {
@@ -1512,20 +1127,105 @@ const handleGenerateRecords = async () => {
   }
 }
 
+// 新增：根据部门分组
+const groupByDept = (persons) => {
+  const groups = {}
+  persons.forEach(person => {
+    const dept = person.dept || '未设置部门'
+    if (!groups[dept]) {
+      groups[dept] = []
+    }
+    groups[dept].push(person)
+  })
+  return groups
+}
+
+// 新增：格式化日期头（显示周六/周日和日期）
+const formatDateHeader = (dateStr, isSaturday) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const weekday = isSaturday ? '周六' : '周日'
+  return `${weekday}\n（${month}月${day}日）`
+}
+
+// 新增：获取下一天日期
+const getNextDay = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  date.setDate(date.getDate() + 1)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+
+// 导出详情为PNG
+const exportDetailToPng = async () => {
+  exportLoading.value = true
+  try {
+    await nextTick()
+    const container = exportContainer.value
+    if (!container) {
+      ElMessage.error('导出容器不存在')
+      return
+    }
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      width: container.offsetWidth,
+      height: container.offsetHeight,
+      windowWidth: container.scrollWidth,
+      windowHeight: container.scrollHeight,
+      backgroundColor: '#ffffff'
+    })
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.download = `值班详情_${selectedDayInfo.dateStr}.png`
+    a.href = url
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功！')
+  } catch (error) {
+    console.error('导出PNG失败:', error)
+    ElMessage.error('导出失败，请重试')
+  } finally {
+    exportLoading.value = false
+  }
+}
+
+// 初始化用户信息
+const initUserInfo = () => {
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo) {
+      const user = JSON.parse(userInfo)
+      if (!loginUserStore.loginUser.id) {
+        loginUserStore.setLoginUser(user)
+      }
+    }
+  } catch (error) {
+    console.error('初始化用户信息失败:', error)
+  }
+}
+
 // 组件挂载时加载数据
 onMounted(async () => {
-  // 先初始化用户信息
   initUserInfo()
-  
-  // 所有用户都需要加载配置（用于显示值班安排）
   await loadConfigFromLocal()
-  
-  // 只有管理员才加载用户列表（用于配置管理）
-  if (isAdmin.value) {
-    await loadUserList()
-  }
-  
+  if (isAdmin.value) await loadUserList()
   refreshCalendar()
+})
+
+// 监听配置对话框打开，加载用户列表
+watch(showConfigDialog, (newVal) => {
+  if (newVal && isAdmin.value && allUsers.value.length === 0) {
+    loadUserList()
+  }
 })
 </script>
 
@@ -1735,13 +1435,6 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-.section-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
 .section-desc {
   color: #909399;
   font-size: 14px;
@@ -1828,68 +1521,184 @@ onMounted(async () => {
   }
 }
 
-/* 日期详情对话框样式 */
-.day-detail {
-  padding: 16px 0;
-}
-
-/* 导出容器样式（确保截图完整） */
+/* 导出容器样式 */
 .export-container {
-  padding: 20px;
+  padding: 40px;
   background: #ffffff;
   border-radius: 8px;
 }
 
-.detail-date {
+.duty-table-wrapper {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.table-title {
+  text-align: center;
+  font-size: 26px;
+  font-weight: bold;
+  margin-bottom: 30px;
+  color: #000000;
+  letter-spacing: 2px;
+}
+
+.duty-export-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2.5px solid #000000;
+  font-size: 15px;
+  background-color: #ffffff !important;
+}
+
+.duty-export-table th,
+.duty-export-table td {
+  border: 1.5px solid #000000;
+  padding: 14px 12px;
+  text-align: center;
+  background-color: #ffffff !important;
+  color: #000000;
+}
+
+.dept-header {
+  width: 140px;
+  padding: 18px 12px !important;
+  background: #ffffff !important;
+  font-weight: bold;
+  font-size: 15px;
+  text-align: center;
+  vertical-align: middle;
+  color: #000000;
+}
+
+.date-header {
+  width: auto;
+  font-weight: bold;
+  white-space: pre-line;
+  line-height: 1.8;
+  padding: 18px 20px !important;
+  background: #ffffff !important;
+  font-size: 15px;
+  text-align: center;
+  color: #000000;
+}
+
+
+/* 对角线表头样式 */
+.diagonal-header {
+  position: relative;
+  width: 100%;
+  height: 70px;
+  padding: 0;
+}
+
+.diagonal-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-bottom: 1.5px solid #000000;
+  transform-origin: bottom left;
+  transform: skewY(-26.57deg);
+}
+
+.header-dept {
+  position: absolute;
+  left: 15px;
+  bottom: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #000000;
+}
+
+.header-date {
+  position: absolute;
+  right: 15px;
+  top: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #000000;
+}
+
+.date-header {
+  width: auto;
+  font-weight: bold;
+  white-space: pre-line;
+  line-height: 1.8;
+  padding: 18px 20px !important;
+  background: #ffffff !important;
+  font-size: 15px;
+  text-align: center;
+  color: #000000;
+}
+
+.dept-cell {
+  font-weight: bold;
+  vertical-align: middle;
+  background-color: #ffffff !important;
+  min-width: 120px;
+  font-size: 15px;
+  color: #000000;
+}
+
+.person-cell {
+  text-align: left;
+  padding: 12px 16px !important;
+  background-color: #ffffff !important;
+  color: #000000;
+}
+.person-info-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e4e7ed;
+  justify-content: flex-start;
+}
+
+
+
+.person-name-text {
+  font-weight: 500;
+  margin-right: 4px;
+  font-size: 15px;
+  color: #000000;
+}
+
+.person-phone-text {
+  font-weight: normal;
+  font-size: 15px;
+  color: #000000;
+}
+
+.empty-cell {
+  color: #666666;
   font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+  background-color: #ffffff !important;
 }
 
-.detail-persons {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.empty-message {
+  padding: 24px !important;
+  color: #999999;
+  background-color: #ffffff !important;
 }
 
-.person-card {
-  padding: 16px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  border: 1px solid #e4e7ed;
-}
-
-.person-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
 
 .person-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+  font-weight: bold;
+  margin-right: 4px;
+  font-size: 15px;
+  color: #000000;
 }
 
-.person-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.person-phone {
+  font-size: 15px;
+  color: #000000;
 }
 
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #606266;
-  font-size: 14px;
+.empty-message {
+  padding: 24px !important;
+  color: #999999;
+  background-color: #ffffff !important;
 }
 
 /* 已选用户列表样式 */
