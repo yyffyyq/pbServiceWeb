@@ -12,9 +12,12 @@ spring:
   # todo 需替换配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/scheduling
+#    url: jdbc:mysql://localhost:3306/scheduling
+#    username: root
+#    password: 123456
+    url: jdbc:mysql://223.4.249.106:3306/scheduling?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: 123456
+    password: 0f040c1adb43e34e
 
   # 文件上传
   servlet:

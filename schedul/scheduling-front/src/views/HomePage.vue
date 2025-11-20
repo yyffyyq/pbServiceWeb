@@ -1643,45 +1643,46 @@ watch(showConfigDialog, (newVal) => {
   color: #000000;
 }
 
+/* 关键样式修改 - 确保姓名电话居中 */
 .person-cell {
-  text-align: left;
-  padding: 12px 16px !important;
-  background-color: #ffffff !important;
-  color: #000000;
+  text-align: center; /* 让单元格内的内容水平居中 */
+  vertical-align: middle; /* 表格单元格垂直居中（重要） */
+  padding: 8px 0; /* 上下内边距，让内容不贴边 */
 }
+
 .person-info-cell {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  display: inline-flex; /* 行内弹性盒，确保子元素垂直对齐 */
+  align-items: center; /* 子元素垂直居中（兼容所有浏览器） */
 }
-
-
 
 .person-name-text {
   font-weight: 500;
   margin-right: 4px;
   font-size: 15px;
   color: #000000;
+  /* vertical-align 可保留，也可删除（flex已处理垂直居中） */
 }
 
 .person-phone-text {
   font-weight: normal;
   font-size: 15px;
   color: #000000;
+  /* vertical-align 可保留，也可删除（flex已处理垂直居中） */
 }
 
-.empty-cell {
-  color: #666666;
-  font-size: 16px;
-  background-color: #ffffff !important;
+/* 可选优化：部门单元格也居中，保持整体风格一致 */
+.dept-cell {
+  text-align: center;
+  vertical-align: middle;
+  padding: 8px;
 }
 
+/* 空数据提示也居中 */
 .empty-message {
-  padding: 24px !important;
-  color: #999999;
-  background-color: #ffffff !important;
+  text-align: center;
+  padding: 16px;
+  color: #666;
 }
-
 
 .person-name {
   font-weight: bold;
