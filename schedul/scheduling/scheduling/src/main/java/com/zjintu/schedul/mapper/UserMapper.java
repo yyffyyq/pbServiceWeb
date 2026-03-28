@@ -1,6 +1,6 @@
 package com.zjintu.schedul.mapper;
 
-import com.zjintu.schedul.model.entity.User;
+import com.zjintu.schedul.model.entity.user.User;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**

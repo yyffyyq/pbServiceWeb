@@ -1,8 +1,9 @@
 package com.zjintu.schedul.service;
 
 import com.zjintu.schedul.model.dto.duty.*;
-import com.zjintu.schedul.model.vo.DutyConfigVO;
-import com.zjintu.schedul.model.vo.DutyPersonVO;
+import com.zjintu.schedul.model.vo.duptVO.DeptVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyConfigVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
 
 import java.util.Date;
 import java.util.List;
@@ -55,5 +56,12 @@ public interface DutyService {
      * @return 更新后开始日期的值班人员列表
      */
     List<DutyPersonVO> updateDutyConfigFrom(DutyConfigUpdateFromRequest request);
+
+    /**
+     * 获取部门信息接口
+     * @return List<DeptVO>
+     */
+    List<DeptVO> selectDeptVOList();
+
 }
 

@@ -1,33 +1,30 @@
 package com.zjintu.schedul.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.exception.BusinessException;
 import com.zjintu.schedul.exception.ThrowUtils;
-import com.zjintu.schedul.mapper.DutyConfigMapper;
-import com.zjintu.schedul.mapper.DutyPersonMapper;
-import com.zjintu.schedul.mapper.UserMapper;
-import com.zjintu.schedul.mapper.DutyRecordMapper;
+import com.zjintu.schedul.mapper.*;
 import com.zjintu.schedul.model.dto.duty.DutyConfigRequest;
 import com.zjintu.schedul.model.dto.duty.DutyPersonAddRequest;
 import com.zjintu.schedul.model.dto.duty.DutyConfigUpdateFromRequest;
-import com.zjintu.schedul.model.entity.DutyConfig;
-import com.zjintu.schedul.model.entity.DutyPerson;
-import com.zjintu.schedul.model.entity.User;
-import com.zjintu.schedul.model.entity.DutyRecord;
-import com.zjintu.schedul.model.vo.DutyConfigVO;
-import com.zjintu.schedul.model.vo.DutyPersonVO;
+import com.zjintu.schedul.model.entity.dupt.DutyConfig;
+import com.zjintu.schedul.model.entity.dupt.DutyPerson;
+import com.zjintu.schedul.model.entity.user.User;
+import com.zjintu.schedul.model.entity.dupt.DutyRecord;
+import com.zjintu.schedul.model.entity.dupt.Duty;
+import com.zjintu.schedul.model.vo.duptVO.DeptVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyConfigVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
 import com.zjintu.schedul.service.DutyService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 值班服务实现类
@@ -47,6 +44,9 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
 
     @Resource
     private DutyRecordMapper dutyRecordMapper;
+
+    @Resource
+    private DutyMapper dutyMapper;
 
     @Override
     public DutyConfigVO getDutyConfig() {
@@ -423,6 +423,7 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
             configWrapper.orderByDesc("createTime");
             configWrapper.last("LIMIT 1");
             DutyConfig dutyConfig = dutyConfigMapper.selectOne(configWrapper);
+
             Date baseDate = dutyConfig != null ? dutyConfig.getBaseDate() : null;
 
             // 第三步：遍历「指定日期及之后」的每一天（修复循环终止条件）
@@ -505,6 +506,22 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
             e.printStackTrace();
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新值班配置失败");
         }
+    }
+
+    /**
+     * 获取部门信息接口
+     * @return
+     */
+    @Override
+    public List<DeptVO> selectDeptVOList() {
+        List<Duty> duties = dutyMapper.selectList(null);
+        List<DeptVO> deptVOList = new ArrayList<>();
+        for (Duty duty : duties) {
+            DeptVO deptVO = new DeptVO();
+            BeanUtils.copyProperties(duty, deptVO);
+            deptVOList.add(deptVO);
+        }
+        return deptVOList;
     }
 
 

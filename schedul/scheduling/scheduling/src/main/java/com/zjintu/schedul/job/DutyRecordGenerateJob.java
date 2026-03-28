@@ -2,10 +2,11 @@ package com.zjintu.schedul.job;
 
 import com.zjintu.schedul.service.DutyRecordService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
+
 import java.util.Calendar;
 import java.util.Date;
 
@@ -17,7 +18,7 @@ import java.util.Date;
 @Slf4j
 public class DutyRecordGenerateJob {
 
-    @Resource
+    @Autowired
     private DutyRecordService dutyRecordService;
 
     /**

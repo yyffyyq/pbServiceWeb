@@ -6,12 +6,12 @@ import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.common.ResultUtils;
 import com.zjintu.schedul.constant.UserConstant;
 import com.zjintu.schedul.exception.ThrowUtils;
-import com.zjintu.schedul.model.vo.DutyRecordVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyRecordVO;
 import com.zjintu.schedul.service.DutyRecordService;
+import jakarta.annotation.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
 import java.util.Date;
 import java.util.List;
 

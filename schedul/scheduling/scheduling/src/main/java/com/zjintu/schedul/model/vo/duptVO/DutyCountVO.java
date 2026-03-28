@@ -1,4 +1,4 @@
-package com.zjintu.schedul.model.vo;
+package com.zjintu.schedul.model.vo.duptVO;
 
 import lombok.Data;
 

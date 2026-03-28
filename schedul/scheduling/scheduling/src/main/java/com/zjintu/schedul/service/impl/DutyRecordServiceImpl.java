@@ -5,17 +5,17 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.mapper.DutyRecordMapper;
 import com.zjintu.schedul.mapper.UserMapper;
-import com.zjintu.schedul.model.entity.DutyRecord;
-import com.zjintu.schedul.model.entity.User;
-import com.zjintu.schedul.model.vo.DutyPersonVO;
-import com.zjintu.schedul.model.vo.DutyRecordVO;
+import com.zjintu.schedul.model.entity.dupt.DutyRecord;
+import com.zjintu.schedul.model.entity.user.User;
+import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyRecordVO;
 import com.zjintu.schedul.service.DutyRecordService;
 import com.zjintu.schedul.service.DutyService;
+import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -38,6 +38,7 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
     private UserMapper userMapper;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public List<DutyRecordVO> getDutyRecordsByUserId(Long userId) {
         QueryWrapper<DutyRecord> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("userId", userId);

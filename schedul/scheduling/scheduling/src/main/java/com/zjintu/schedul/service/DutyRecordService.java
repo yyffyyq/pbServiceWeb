@@ -2,8 +2,8 @@ package com.zjintu.schedul.service;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zjintu.schedul.model.entity.DutyRecord;
-import com.zjintu.schedul.model.vo.DutyRecordVO;
+import com.zjintu.schedul.model.entity.dupt.DutyRecord;
+import com.zjintu.schedul.model.vo.duptVO.DutyRecordVO;
 
 import java.util.Date;
 import java.util.List;

@@ -80,6 +80,17 @@ export const addUser = (data) => {
 };
 
 /**
+ * 批量添加用户（管理员）
+ */
+export const batchAddUser = (data) => {
+  return request({
+    method: "post",
+    url: "user/batchAdd",
+    data: data,
+  });
+};
+
+/**
  * 根据 id 获取用户（管理员）
  */
 export const getUserById = (id) => {
@@ -135,6 +146,27 @@ export const listUserVOByPage = (data) => {
 };
 
 // ========== 值班管理相关接口 ==========
+
+/**
+ * 获取部门信息列表
+ */
+export const getDept = () => {
+  return request({
+    method: "get",
+    url: "duty/getDept",
+  });
+};
+
+/**
+ * 用户查询列表根据部门id
+ */
+export const getUserBydeptId = (deptId, params) => {
+  return request({
+    method: "get",
+    url: `user/getUserBydeptId/${deptId}`,
+    params: params
+  });
+};
 
 /**
  * 获取值班配置（包括基准日期和所有值班人员列表）
@@ -260,6 +292,54 @@ export const updateDutyConfigFrom = (startDate, config, remark) => {
 };
 
 
+
+// ========== 节假日管理相关接口 ==========
+
+/**
+ * 获取节假日列表
+ */
+export const getHolidayList = () => {
+  return request({
+    method: "get",
+    url: "duty/holiday/getlist",
+  });
+};
+
+/**
+ * 设置/新增节假日
+ * @param {Object} data - { holidayDate: "yyyy-MM-dd" }
+ */
+export const setHoliday = (data) => {
+  return request({
+    method: "post",
+    url: "duty/holiday/setHoliday",
+    data: data,
+  });
+};
+
+/**
+ * 删除节假日
+ * @param {Object} data - { holidayDate: "yyyy-MM-dd" }
+ */
+export const deleteHoliday = (data) => {
+  return request({
+    method: "post",
+    url: "duty/holiday/deleteHoliday",
+    data: data,
+  });
+};
+
+
+/**
+ * 查询获取补班日期列表
+ * 接口描述: 查询补班信息用于前端获取
+ */
+export const getWorkdayList = () => {
+  return request({
+    method: "get",
+    url: "duty/holiday/getList/workday",
+  });
+};
 
 
 

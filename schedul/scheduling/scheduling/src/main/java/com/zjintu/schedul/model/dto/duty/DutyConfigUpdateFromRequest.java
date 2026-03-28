@@ -21,6 +21,7 @@ public class DutyConfigUpdateFromRequest implements Serializable {
      * - saturdayGroup1: 周六单周组人员列表
      * - saturdayGroup2: 周六双周组人员列表
      * - monthEndDutyList: 月末值班人员列表
+     * - clearedDates: 免排班顺延日期列表
      */
     private Map<String, Object> config;
 

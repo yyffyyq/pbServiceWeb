@@ -1,4 +1,4 @@
-package com.zjintu.schedul.model.vo;
+package com.zjintu.schedul.model.vo.duptVO;
 
 import lombok.Data;
 
@@ -37,5 +37,10 @@ public class DutyConfigVO implements Serializable {
     private List<DutyPersonVO> monthEndDutyList;
 
     private static final long serialVersionUID = 1L;
+
+    /**
+     * 免排班顺延日期列表
+     */
+    private List<String> clearedDates;
 }
 

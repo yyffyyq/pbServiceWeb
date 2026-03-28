@@ -9,18 +9,18 @@ import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.constant.UserConstant;
 import com.zjintu.schedul.exception.BusinessException;
 import com.zjintu.schedul.model.dto.user.UserQueryRequest;
-import com.zjintu.schedul.model.entity.User;
+import com.zjintu.schedul.model.entity.user.User;
 import com.zjintu.schedul.mapper.UserMapper;
 import com.zjintu.schedul.model.enums.UserRoleEnum;
-import com.zjintu.schedul.model.vo.LoginUserVO;
-import com.zjintu.schedul.model.vo.UserVO;
+import com.zjintu.schedul.model.vo.userVO.LoginUserVO;
+import com.zjintu.schedul.model.vo.userVO.UserVO;
 import com.zjintu.schedul.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.ArrayList;
 import java.util.List;

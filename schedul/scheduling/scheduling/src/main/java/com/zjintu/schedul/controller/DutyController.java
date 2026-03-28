@@ -8,15 +8,14 @@ import com.zjintu.schedul.common.ResultUtils;
 import com.zjintu.schedul.constant.UserConstant;
 import com.zjintu.schedul.exception.ThrowUtils;
 import com.zjintu.schedul.model.dto.duty.*;
-import com.zjintu.schedul.model.vo.DutyConfigVO;
-import com.zjintu.schedul.model.vo.DutyPersonVO;
-import com.zjintu.schedul.model.vo.DutyCountVO;
+import com.zjintu.schedul.model.vo.duptVO.DeptVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyConfigVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
 import com.zjintu.schedul.service.DutyRecordService;
 import com.zjintu.schedul.service.DutyService;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
-
-import javax.annotation.Resource;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -31,6 +30,19 @@ public class DutyController {
 
     @Resource
     private DutyRecordService dutyRecordService;
+
+
+    /***
+     * 新增功能：
+     * 获取部门信息接口
+     */
+    @GetMapping("/getDept")
+    @Operation(summary = "获取部门信息", description = "用于查询部门信息列表")
+    public BaseResponse<List<DeptVO>> getDeptList(){
+        List<DeptVO> deptVOList = dutyService.selectDeptVOList();
+        return ResultUtils.success(deptVOList);
+    }
+
 
     /**
      * 获取值班配置（包括基准日期和所有值班人员列表）

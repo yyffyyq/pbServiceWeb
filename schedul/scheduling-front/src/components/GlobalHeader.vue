@@ -22,6 +22,14 @@
           >
             用户管理
           </router-link>
+          <router-link
+              v-if="isAdmin"
+              to="/admin/holidayOrworkday"
+              class="nav-item"
+              :class="{ active: currentPath === '/admin/holidayOrworkday' }"
+          >
+            节假日管理
+          </router-link>
         </div>
       </div>
       <div class="header-right">

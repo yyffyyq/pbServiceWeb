@@ -31,7 +31,8 @@ export default defineConfig({
     proxy: {
       "/api": {
         // target: "http://223.4.249.106:8101/api/",
-        target: "http://223.4.249.106:8101/api/",
+        // target: "http://223.4.249.106:8101/api/",
+        target :"http://localhost:8101/api/",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },

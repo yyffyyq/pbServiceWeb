@@ -1,4 +1,4 @@
-package com.zjintu.schedul.model.entity;
+package com.zjintu.schedul.model.entity.dupt;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

@@ -2,7 +2,7 @@ package com.zjintu.schedul.mapper;
 
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zjintu.schedul.model.entity.DutyRecord;
+import com.zjintu.schedul.model.entity.dupt.DutyRecord;
 
 /**
 * @author Administrator

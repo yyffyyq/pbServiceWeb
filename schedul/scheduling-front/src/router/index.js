@@ -1,11 +1,11 @@
-import Test from "@/views/test.vue";
 import { getToken } from "@/utils/token";
 
 import { createRouter, createWebHistory } from "vue-router";
 import UserRegisterPage from "@/views/user/UserRegisterPage.vue";
 import UserLoginPage from "@/views/user/UserLoginPage.vue";
-import HomePage from "@/views/HomePage.vue";
+import HomePage from "@/views/HomePage/index.vue";
 import UserManagePage from "@/views/admin/UserManagePage.vue";
+import HolidayOrWorkPage from "@/views/holidayOrwork/index.vue";
 
 
 
@@ -22,11 +22,6 @@ const router = createRouter({
       component: HomePage,
     },
     {
-      name: "test",
-      path: "/test",
-      component: Test,
-    },
-    {
       name: "register",
       path: "/user/register",
       component: UserRegisterPage,
@@ -41,6 +36,11 @@ const router = createRouter({
       path: "/admin/userManage",
       component: UserManagePage,
     },
+    {
+      name:"holidayOrworkday",
+      path:"/admin/holidayOrworkday",
+      component:HolidayOrWorkPage,
+    }
 
     // my_information
     

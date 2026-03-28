@@ -1,3 +1,4 @@
+debug: true
 spring:
   application:
     name: scheduling
@@ -15,9 +16,9 @@ spring:
 #    url: jdbc:mysql://localhost:3306/scheduling
 #    username: root
 #    password: 123456
-    url: jdbc:mysql://223.4.249.106:3306/scheduling?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/scheduling?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: 0f040c1adb43e34e
+    password: jintuyfy
 
   # 文件上传
   servlet:
@@ -34,6 +35,7 @@ server:
       cookie:
         max-age: 2592000
 mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: false
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
@@ -46,11 +48,16 @@ mybatis-plus:
 # 接口文档配置
 knife4j:
   enable: true
-  openapi:
-    title: "接口文档"
-    version: 1.0
-    group:
-      default:
-        api-rule: package
-        api-rule-resources:
-          - com.zjintu.schedul.controller
+  setting:
+    language: zh-CN
+# Spring Boot 3 下 Knife4j 扫描包的配置现在由 springdoc 接管
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  packages-to-scan: com.zjintu.schedul.controller
+
+

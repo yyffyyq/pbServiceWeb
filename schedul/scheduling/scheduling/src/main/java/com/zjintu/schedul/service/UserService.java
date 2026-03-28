@@ -2,12 +2,12 @@ package com.zjintu.schedul.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zjintu.schedul.model.dto.user.UserQueryRequest;
-import com.zjintu.schedul.model.entity.User;
+import com.zjintu.schedul.model.entity.user.User;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zjintu.schedul.model.vo.LoginUserVO;
-import com.zjintu.schedul.model.vo.UserVO;
+import com.zjintu.schedul.model.vo.userVO.LoginUserVO;
+import com.zjintu.schedul.model.vo.userVO.UserVO;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**

@@ -1,4 +1,4 @@
-package com.zjintu.schedul.model.entity;
+package com.zjintu.schedul.model.entity.user;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -9,29 +9,33 @@ import java.util.Date;
 import lombok.Data;
 
 /**
- * @TableName duty_record
+ * @TableName sys_user
  */
-@TableName(value ="duty_record")
+@TableName(value ="sys_user")
 @Data
-public class DutyRecord implements Serializable {
+public class User implements Serializable {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
-    private Long userId;
+    private String dept;
 
-    private Date dutyDate;
+    private String userAccount;
 
-    private String dutyType;
+    private String userName;
 
-    private String status;
+    private String userPassword;
 
-    private String remark;
+    private String phone;
+
+    private String userRole;
 
     private Date createTime;
 
     private Date updateTime;
     @TableLogic
     private Integer isDelete;
+
+
 
     private static final long serialVersionUID = 1L;
 }

@@ -1,8 +1,7 @@
 package com.zjintu.schedul.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zjintu.schedul.model.entity.DutyConfig;
-import org.apache.ibatis.annotations.Mapper;
+import com.zjintu.schedul.model.entity.dupt.DutyConfig;
 
 /**
  * 值班配置Mapper
