@@ -1,21 +1,26 @@
-package com.zjintu.schedul.service.impl;
+package com.zjintu.schedul.service.dupt.impl;
 
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zjintu.schedul.mapper.DutyRecordMapper;
-import com.zjintu.schedul.mapper.UserMapper;
+import com.zjintu.schedul.common.ErrorCode;
+import com.zjintu.schedul.exception.BusinessException;
+import com.zjintu.schedul.exception.ThrowUtils;
+import com.zjintu.schedul.mapper.duty.DutyRecordMapper;
+import com.zjintu.schedul.mapper.user.UserMapper;
 import com.zjintu.schedul.model.entity.dupt.DutyRecord;
 import com.zjintu.schedul.model.entity.user.User;
 import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyRecordVO;
-import com.zjintu.schedul.service.DutyRecordService;
-import com.zjintu.schedul.service.DutyService;
+import com.zjintu.schedul.service.dupt.DutyRecordService;
+import com.zjintu.schedul.service.dupt.DutyService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -36,6 +41,10 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
 
     @Resource
     private UserMapper userMapper;
+
+    @Resource
+    private DutyRecordMapper dutyRecordMapper;
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -199,6 +208,58 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
             }
             return vo;
         }).collect(Collectors.toList());
+    }
+/// ===================================临时值班组相关业务逻辑======================================
+    /**
+     * @param currentDate 插入临时组排班日期
+     */
+    @Override
+    public String updateTheDayDutyRecord(Date currentDate,Long userId,String type_group) {
+        // 判断参数
+        ThrowUtils.throwIf(currentDate==null||userId == null, ErrorCode.PARAMS_ERROR);
+        // 这里需要做一个用户id是否存在的判断
+        if(userMapper.selectById(userId)==null){
+            return "用户不存在";
+        }
+        // todo 需要添加判断，判断该用户是否在这一天值班，逻辑删除是否删除，分别用三套方案
+        // 根据日期以及用户id去判断是否存在这天排班，该用户
+        DutyRecord record = new DutyRecord();
+        record.setDutyDate(atStartOfDay(currentDate));
+        record.setUserId(userId);
+        record.setDutyType(type_group);
+        record = dutyRecordMapper.selectDutyRecord(record);
+        String result = "";
+        if (record != null) {
+            switch (record.getIsDelete()){
+                case 0:result = "已存在";break;
+                case 1:ThrowUtils.throwIf(dutyRecordMapper.updateIsdelete(record), ErrorCode.OPERATION_ERROR);
+                result = "添加成功";
+                break;
+                default:break;
+            }
+        }else {
+            record = new DutyRecord();
+            record.setUserId(userId);
+            record.setDutyType(type_group);
+            record.setDutyDate(atStartOfDay(currentDate));
+            dutyRecordMapper.insert(record);
+            result = "添加成功";
+            return result;
+        }
+        return result;
+    }
+    /**
+     * 将 Date 的时分秒毫秒全部清零，只保留日期部分
+     */
+    private Date atStartOfDay(Date date) {
+        if (date == null) return null;
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(date);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTime();
     }
 }
 

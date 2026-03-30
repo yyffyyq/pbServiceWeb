@@ -1,4 +1,4 @@
-package com.zjintu.schedul.service;
+package com.zjintu.schedul.service.dupt;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zjintu.schedul.model.dto.duty.DutyHolidayRequest;

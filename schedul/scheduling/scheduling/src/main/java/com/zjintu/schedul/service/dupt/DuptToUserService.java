@@ -1,4 +1,4 @@
-package com.zjintu.schedul.service.dept;
+package com.zjintu.schedul.service.dupt;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zjintu.schedul.model.entity.dupt.DeptToUser;
@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 关联用户user与dept通过id
  */
-public interface DeptToUserService extends IService<DeptToUser> {
+public interface DuptToUserService extends IService<DeptToUser> {
 
     /**
      * 获取用户id通过deptId

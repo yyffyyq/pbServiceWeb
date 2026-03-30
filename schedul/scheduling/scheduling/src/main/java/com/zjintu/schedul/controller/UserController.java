@@ -20,9 +20,9 @@ import com.zjintu.schedul.model.entity.user.User;
 import com.zjintu.schedul.model.entity.dupt.DeptToUser;
 import com.zjintu.schedul.model.vo.userVO.LoginUserVO;
 import com.zjintu.schedul.model.vo.userVO.UserVO;
-import com.zjintu.schedul.service.DutyService;
-import com.zjintu.schedul.service.UserService;
-import com.zjintu.schedul.service.dept.DeptToUserService;
+import com.zjintu.schedul.service.dupt.DutyService;
+import com.zjintu.schedul.service.user.UserService;
+import com.zjintu.schedul.service.dupt.DuptToUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
@@ -45,7 +45,7 @@ public class UserController {
     private DutyService dutyService;
 
     @Resource
-    private DeptToUserService deptToUserService;
+    private DuptToUserService duptToUserService;
 
 
     // 在类中注入或静态调用
@@ -65,7 +65,7 @@ public class UserController {
 
         /// 先通过deptId获取到关联用户id
         /// 拿查到的用户id去一个一个获取到用户信息通过这个id
-        List<UserVO> userVOList = deptToUserService.getdutyVOlist(deptId);
+        List<UserVO> userVOList = duptToUserService.getdutyVOlist(deptId);
         /// 获取封装后列表长度
         int total = userVOList.size();
 
@@ -228,7 +228,7 @@ public class UserController {
                 return deptToUser;
             }).collect(Collectors.toList());
             // 这里有问题
-            deptToUserService.saveBatch(deptToUserList);
+            duptToUserService.saveBatch(deptToUserList);
 
         }
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);

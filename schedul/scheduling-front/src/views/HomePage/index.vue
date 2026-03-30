@@ -108,6 +108,7 @@
         @edit-click="handleEditDayDuty"
         @set-holiday="handleSetHoliday"
         @clear-holiday="handleClearHoliday"
+        @refresh="refreshCalendar"
     />
   </div>
 </template>

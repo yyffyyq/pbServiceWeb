@@ -10,7 +10,15 @@
 <template>
   <el-dialog v-model="visible" title="值班人员详情" width="900px" class="apple-dialog detail-dialog">
     <div class="detail-actions">
-      <el-button v-if="isAdmin && info.isEditable" class="apple-btn primary-light" :icon="Edit" @click="$emit('edit-click')">编辑排班</el-button>
+<!--      <el-button v-if="isAdmin && info.isEditable" class="apple-btn primary-light" :icon="Edit" @click="$emit('edit-click')">编辑排班</el-button>-->
+      <el-button
+          v-if="isAdmin && info.isEditable"
+          class="apple-btn primary"
+          :icon="Plus"
+          @click="showTempSelector = true"
+      >
+        临时排班
+      </el-button>
       <el-button v-if="isAdmin && info.isHoliday" class="apple-btn danger" @click="$emit('clear-holiday', info.dateStr)">
         清空放假
       </el-button>
@@ -43,6 +51,11 @@
         </table>
       </div>
     </div>
+    <TempDutyPersonSelector
+        v-model:show="showTempSelector"
+        :target-date="info.dateStr"
+        @success="$emit('refresh')"
+    />
   </el-dialog>
 </template>
 
@@ -51,13 +64,17 @@ import { ref, computed, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Edit, Download } from '@element-plus/icons-vue';
 import html2canvas from 'html2canvas';
+import TempDutyPersonSelector from './duty/TempDutyPersonSelector/index.vue';
 
 const props = defineProps({ modelValue: Boolean, info: Object, isAdmin: Boolean });
 // 设置按键触发事件
-const emit = defineEmits(['update:modelValue', 'edit-click','set-holiday', 'clear-holiday']);
+const emit = defineEmits(['update:modelValue', 'edit-click','set-holiday', 'clear-holiday','refresh']);
 const visible = computed({ get: () => props.modelValue, set: (val) => emit('update:modelValue', val) });
 const exportContainer = ref(null);
 const exportLoading = ref(false);
+
+// 定义变量控制弹窗显示与隐藏
+const showTempSelector = ref(false);
 
 const groupByDept = (persons) => { const groups = {}; persons.forEach(p => { const d = p.dept || '未设置'; if (!groups[d]) groups[d] = []; groups[d].push(p) }); return groups; };
 const formatDateHeader = (dateStr, isSaturday) => { if (!dateStr) return ''; const d = new Date(dateStr); return `${isSaturday ? '周六' : '周日'}\n（${d.getMonth() + 1}月${d.getDate()}日）`; };

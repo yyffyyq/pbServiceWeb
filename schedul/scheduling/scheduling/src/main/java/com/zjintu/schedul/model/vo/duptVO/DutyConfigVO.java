@@ -36,6 +36,11 @@ public class DutyConfigVO implements Serializable {
      */
     private List<DutyPersonVO> monthEndDutyList;
 
+    /**
+     * 临时值班人员列表
+     */
+    private List<DutyPersonVO> groupeTemporaireList;
+
     private static final long serialVersionUID = 1L;
 
     /**

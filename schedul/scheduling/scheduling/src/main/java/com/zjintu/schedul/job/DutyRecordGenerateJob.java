@@ -1,6 +1,6 @@
 package com.zjintu.schedul.job;
 
-import com.zjintu.schedul.service.DutyRecordService;
+import com.zjintu.schedul.service.dupt.DutyRecordService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;

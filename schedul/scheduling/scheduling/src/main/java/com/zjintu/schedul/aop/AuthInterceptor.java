@@ -5,7 +5,7 @@ import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.exception.BusinessException;
 import com.zjintu.schedul.model.entity.user.User;
 import com.zjintu.schedul.model.enums.UserRoleEnum;
-import com.zjintu.schedul.service.UserService;
+import com.zjintu.schedul.service.user.UserService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

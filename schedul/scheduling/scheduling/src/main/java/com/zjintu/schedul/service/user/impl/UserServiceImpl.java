@@ -1,4 +1,4 @@
-package com.zjintu.schedul.service.impl;
+package com.zjintu.schedul.service.user.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
@@ -10,11 +10,11 @@ import com.zjintu.schedul.constant.UserConstant;
 import com.zjintu.schedul.exception.BusinessException;
 import com.zjintu.schedul.model.dto.user.UserQueryRequest;
 import com.zjintu.schedul.model.entity.user.User;
-import com.zjintu.schedul.mapper.UserMapper;
+import com.zjintu.schedul.mapper.user.UserMapper;
 import com.zjintu.schedul.model.enums.UserRoleEnum;
 import com.zjintu.schedul.model.vo.userVO.LoginUserVO;
 import com.zjintu.schedul.model.vo.userVO.UserVO;
-import com.zjintu.schedul.service.UserService;
+import com.zjintu.schedul.service.user.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;

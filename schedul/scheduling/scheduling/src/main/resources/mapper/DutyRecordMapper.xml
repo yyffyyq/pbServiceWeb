@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zjintu.schedul.mapper.duty.DutyRecordMapper">
+
+    <insert id="addRecord" parameterType="com.zjintu.schedul.model.entity.dupt.DutyRecord">
+        insert INTO duty_record (
+            userId,
+            dutyDate,
+            dutyType,
+            status,
+            remark,
+            createTime,
+            updateTime,
+            isDelete
+        ) VALUES (
+                     #{userId},
+                     #{currentDate},
+                     "groupe_temporaire",
+                     "normal",
+                     null,
+                     NOW(),
+                     NOW(),
+                     0
+                 )
+    </insert>
+
+    <select id="selectDutyRecord" parameterType="com.zjintu.schedul.model.entity.dupt.DutyRecord" resultType="com.zjintu.schedul.model.entity.dupt.DutyRecord">
+        select * from duty_record
+        <where>
+            <if test="id != null">
+                AND id = #{id}
+            </if>
+            <if test="userId != null">
+                AND userId = #{userId}
+            </if>
+            <if test="dutyDate != null">
+                AND dutyDate = #{dutyDate}
+            </if>
+            <if test="dutyType != null and dutyType != ''">
+                AND dutyType = #{dutyType}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <update id="updateIsdelete" parameterType="com.zjintu.schedul.model.entity.dupt.DutyRecord">
+        update duty_record
+        set isDelete = 0
+        where userId = #{userId}
+        and dutyType = #{dutyType}
+    </update>
+</mapper>

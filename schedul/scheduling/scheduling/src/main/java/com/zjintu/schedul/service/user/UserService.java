@@ -1,4 +1,4 @@
-package com.zjintu.schedul.service;
+package com.zjintu.schedul.service.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zjintu.schedul.model.dto.user.UserQueryRequest;

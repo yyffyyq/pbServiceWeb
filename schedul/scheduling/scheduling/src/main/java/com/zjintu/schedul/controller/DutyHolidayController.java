@@ -9,7 +9,7 @@ import com.zjintu.schedul.model.entity.DutyDay.DutyHoliday;
 import com.zjintu.schedul.model.entity.DutyDay.DutyWorkday;
 import com.zjintu.schedul.model.vo.dutyDayVO.DutyHolidayVO;
 import com.zjintu.schedul.model.vo.dutyDayVO.DutyWorkdayVO;
-import com.zjintu.schedul.service.DutyHolidayService;
+import com.zjintu.schedul.service.dupt.DutyHolidayService;
 import com.zjintu.schedul.service.duptDay.DutyWorkdayService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;

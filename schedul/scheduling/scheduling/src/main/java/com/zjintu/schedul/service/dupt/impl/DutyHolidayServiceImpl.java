@@ -1,13 +1,13 @@
-package com.zjintu.schedul.service.impl;
+package com.zjintu.schedul.service.dupt.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.exception.BusinessException;
-import com.zjintu.schedul.mapper.DutyHolidayMapper;
+import com.zjintu.schedul.mapper.dutyDay.DutyHolidayMapper;
 import com.zjintu.schedul.model.dto.duty.DutyHolidayRequest;
 import com.zjintu.schedul.model.entity.DutyDay.DutyHoliday;
-import com.zjintu.schedul.service.DutyHolidayService;
+import com.zjintu.schedul.service.dupt.DutyHolidayService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 

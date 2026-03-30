@@ -1,15 +1,15 @@
-package com.zjintu.schedul.service.impl;
+package com.zjintu.schedul.service.dupt.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.exception.ThrowUtils;
-import com.zjintu.schedul.mapper.DeptToUserMapper;
-import com.zjintu.schedul.mapper.UserMapper;
+import com.zjintu.schedul.mapper.duty.DeptToUserMapper;
+import com.zjintu.schedul.mapper.user.UserMapper;
 import com.zjintu.schedul.model.entity.user.User;
 import com.zjintu.schedul.model.entity.dupt.DeptToUser;
 import com.zjintu.schedul.model.vo.userVO.UserVO;
-import com.zjintu.schedul.service.dept.DeptToUserService;
+import com.zjintu.schedul.service.dupt.DuptToUserService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-public class DeptToUserServiceImpl extends ServiceImpl<DeptToUserMapper, DeptToUser> implements DeptToUserService {
+public class DuptToUserServiceImpl extends ServiceImpl<DeptToUserMapper, DeptToUser> implements DuptToUserService {
     @Resource
     private DeptToUserMapper deptToUserMapper;
 

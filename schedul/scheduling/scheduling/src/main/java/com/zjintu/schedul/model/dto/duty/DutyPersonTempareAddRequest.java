@@ -3,12 +3,14 @@ package com.zjintu.schedul.model.dto.duty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
- * 添加值班人员请求
+ * 新增临时值班人员分组请求
  */
 @Data
-public class DutyPersonAddRequest implements Serializable {
+public class DutyPersonTempareAddRequest implements Serializable {
+
     /**
      * 用户ID
      */
@@ -24,6 +26,11 @@ public class DutyPersonAddRequest implements Serializable {
      */
     private String remark;
 
+    /**
+     * 新增临时组日期
+     */
+    private Date baseDate;
     private static final long serialVersionUID = 1L;
-}
 
+
+}

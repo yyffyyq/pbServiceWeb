@@ -1,4 +1,4 @@
-package com.zjintu.schedul.mapper;
+package com.zjintu.schedul.mapper.dutyDay;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zjintu.schedul.model.entity.DutyDay.DutyHoliday;

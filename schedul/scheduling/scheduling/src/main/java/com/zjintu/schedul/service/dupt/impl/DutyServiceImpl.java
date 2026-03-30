@@ -1,14 +1,19 @@
-package com.zjintu.schedul.service.impl;
+package com.zjintu.schedul.service.dupt.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.exception.BusinessException;
 import com.zjintu.schedul.exception.ThrowUtils;
-import com.zjintu.schedul.mapper.*;
+import com.zjintu.schedul.mapper.duty.DutyConfigMapper;
+import com.zjintu.schedul.mapper.duty.DutyMapper;
+import com.zjintu.schedul.mapper.duty.DutyPersonMapper;
+import com.zjintu.schedul.mapper.duty.DutyRecordMapper;
+import com.zjintu.schedul.mapper.user.UserMapper;
 import com.zjintu.schedul.model.dto.duty.DutyConfigRequest;
 import com.zjintu.schedul.model.dto.duty.DutyPersonAddRequest;
 import com.zjintu.schedul.model.dto.duty.DutyConfigUpdateFromRequest;
+import com.zjintu.schedul.model.dto.duty.DutyPersonTempareAddRequest;
 import com.zjintu.schedul.model.entity.dupt.DutyConfig;
 import com.zjintu.schedul.model.entity.dupt.DutyPerson;
 import com.zjintu.schedul.model.entity.user.User;
@@ -17,13 +22,15 @@ import com.zjintu.schedul.model.entity.dupt.Duty;
 import com.zjintu.schedul.model.vo.duptVO.DeptVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyConfigVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
-import com.zjintu.schedul.service.DutyService;
+import com.zjintu.schedul.service.dupt.DutyService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 /**
@@ -73,6 +80,9 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
         // 获取月末值班人员
         configVO.setMonthEndDutyList(getDutyPersonListByType("month_end"));
 
+        // todo获取临时值班人员
+        configVO.setGroupeTemporaireList(getDutyPersonListByType("groupe_temporaire"));
+
         return configVO;
     }
 
@@ -101,6 +111,11 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
         }
     }
 
+    /**
+     * 添加值班分组人员
+     * @param request 添加值班人员请求
+     * @return
+     */
     @Override
     public Long addDutyPerson(DutyPersonAddRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
@@ -108,9 +123,13 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
         ThrowUtils.throwIf(request.getDutyType() == null || request.getDutyType().trim().isEmpty(), ErrorCode.PARAMS_ERROR);
 
         // 验证值班类型
+        // 工作日值班、单周组、双周组、月末两天组、临时值班添加组
         String dutyType = request.getDutyType();
-        if (!dutyType.equals("weekday") && !dutyType.equals("saturday_group1") 
-            && !dutyType.equals("saturday_group2") && !dutyType.equals("month_end")) {
+        if (!dutyType.equals("weekday")
+                && !dutyType.equals("saturday_group1")
+                && !dutyType.equals("saturday_group2")
+                && !dutyType.equals("month_end")
+                && !dutyType.equals("groupe_temporaire")) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "值班类型不正确");
         }
 
@@ -272,114 +291,159 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
         ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(type == null || (!type.equals("month") && !type.equals("year")), ErrorCode.PARAMS_ERROR);
 
-        // 检查用户是否在值班配置中
-        QueryWrapper<DutyPerson> wrapper = new QueryWrapper<>();
-        wrapper.eq("userId", userId);
-        wrapper.eq("isDelete", 0);
-        List<DutyPerson> dutyPersonList = dutyPersonMapper.selectList(wrapper);
-
-        if (dutyPersonList == null || dutyPersonList.isEmpty()) {
-            return 0;
-        }
-
-        // 获取用户的值班类型
-        boolean isWeekdayDuty = dutyPersonList.stream().anyMatch(dp -> "weekday".equals(dp.getDutyType()));
-        boolean isSaturdayGroup1 = dutyPersonList.stream().anyMatch(dp -> "saturday_group1".equals(dp.getDutyType()));
-        boolean isSaturdayGroup2 = dutyPersonList.stream().anyMatch(dp -> "saturday_group2".equals(dp.getDutyType()));
-        boolean isMonthEndDuty = dutyPersonList.stream().anyMatch(dp -> "month_end".equals(dp.getDutyType()));
-
-        if (!isWeekdayDuty && !isSaturdayGroup1 && !isSaturdayGroup2 && !isMonthEndDuty) {
-            return 0;
-        }
-
-        // 获取基准日期
-        QueryWrapper<DutyConfig> configWrapper = new QueryWrapper<>();
-        configWrapper.eq("isDelete", 0);
-        configWrapper.orderByDesc("createTime");
-        configWrapper.last("LIMIT 1");
-        DutyConfig config = dutyConfigMapper.selectOne(configWrapper);
-        Date baseDate = config != null ? config.getBaseDate() : null;
-
-        // 计算时间范围
-        Calendar now = Calendar.getInstance();
-        int currentYear = now.get(Calendar.YEAR);
-        int currentMonth = now.get(Calendar.MONTH);
-
-        Calendar startDate = Calendar.getInstance();
-        Calendar endDate = Calendar.getInstance();
+        // 1. 使用 Java 8 的 LocalDate 来处理日期边界（比 Calendar 好用一万倍）
+        LocalDate today = LocalDate.now();
+        LocalDate startDate;
 
         if ("month".equals(type)) {
-            // 本月
-            startDate.set(currentYear, currentMonth, 1, 0, 0, 0);
-            startDate.set(Calendar.MILLISECOND, 0);
-            endDate.set(currentYear, currentMonth, now.getActualMaximum(Calendar.DAY_OF_MONTH), 23, 59, 59);
-            endDate.set(Calendar.MILLISECOND, 999);
+            startDate = today.withDayOfMonth(1); // 本月 1 号
         } else {
-            // 本年
-            startDate.set(currentYear, 0, 1, 0, 0, 0);
-            startDate.set(Calendar.MILLISECOND, 0);
-            endDate.set(currentYear, 11, 31, 23, 59, 59);
-            endDate.set(Calendar.MILLISECOND, 999);
+            startDate = today.withDayOfYear(1);  // 本年 1 月 1 号
         }
 
-        // 获取今天的日期（忽略时间部分）
-        Calendar today = Calendar.getInstance();
-        today.set(Calendar.HOUR_OF_DAY, 0);
-        today.set(Calendar.MINUTE, 0);
-        today.set(Calendar.SECOND, 0);
-        today.set(Calendar.MILLISECOND, 0);
+        // 将 LocalDate 转换为 java.util.Date，以便传给 MyBatis-Plus 查询
+        Date queryStartDate = Date.from(startDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
 
-        // 计算值班天数（只统计已过去的日期）
-        int count = 0;
-        Calendar currentDate = (Calendar) startDate.clone();
-        currentDate.set(Calendar.HOUR_OF_DAY, 0);
-        currentDate.set(Calendar.MINUTE, 0);
-        currentDate.set(Calendar.SECOND, 0);
-        currentDate.set(Calendar.MILLISECOND, 0);
+        // 获取今天零点，确保只统计“过去”的值班（如果你想把今天的也算进去，这里可以不截断时间）
+        Date queryEndDate = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
 
-        while (currentDate.before(endDate) || currentDate.equals(endDate)) {
-            // 只统计当前日期之前的日期（不包括今天）
-            if (currentDate.before(today)) {
-                int dayOfWeek = currentDate.get(Calendar.DAY_OF_WEEK); // 1-7, 1是周日
-                boolean counted = false;
+        // 2. 直接从 duty_record 真实记录表中 COUNT！
+        QueryWrapper<DutyRecord> wrapper = new QueryWrapper<>();
+        wrapper.eq("userId", userId); // 注意：确保这里的字段名和实体类一致，如果是下划线请改为 user_id
+        wrapper.eq("isDelete", 0);
 
-                // 检查是否为月末最后两天
-                boolean isMonthEndDay = isMonthEndDay(currentDate.getTime());
-                
-                // 如果是月末且用户在月末值班列表中，则计数
-                if (isMonthEndDay && isMonthEndDuty) {
-                    count++;
-                    counted = true;
-                }
-                
-                // 周一到周五（2-6）：如果用户在工作日值班列表中，则计数
-                if (dayOfWeek >= 2 && dayOfWeek <= 6 && isWeekdayDuty) {
-                    count++;
-                    counted = true;
-                }
-                
-                // 周六（7）：根据单周/双周判断
-                if (!counted && dayOfWeek == 7) {
-                    if (baseDate != null) {
-                        boolean isSingle = isSingleWeek(currentDate.getTime(), baseDate);
-                        if ((isSingle && isSaturdayGroup1) || (!isSingle && isSaturdayGroup2)) {
-                            count++;
-                        }
-                    } else {
-                        // 如果没有基准日期，默认单周组
-                        if (isSaturdayGroup1) {
-                            count++;
-                        }
-                    }
-                }
-                // 周日（1）：不安排值班，不计数
-            }
-            // 移动到下一天
-            currentDate.add(Calendar.DAY_OF_MONTH, 1);
-        }
+        // 状态必须是正常值班（如果你的表里有请假 absent、替班 substitute 等状态，这里可以精准过滤）
+        // wrapper.eq("status", "normal");
 
-        return count;
+        // 统计范围：大于等于起始日，且严格小于今天（严格按照你原代码只算过去日期的逻辑）
+        wrapper.ge("dutyDate", queryStartDate);
+        wrapper.lt("dutyDate", queryEndDate);
+
+        // 3. 返回真实的记录数
+        long actualCount = dutyRecordMapper.selectCount(wrapper);
+
+        return Math.toIntExact(actualCount);
     }
+
+    /***
+     * ============================================原本前辈选择的计算值班时间的逻辑
+     * @param request 更新请求
+     * @return
+     */
+//    @Override
+//    public Integer getDutyCount(Long userId, String type) {
+//        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
+//        ThrowUtils.throwIf(type == null || (!type.equals("month") && !type.equals("year")), ErrorCode.PARAMS_ERROR);
+//
+//        // 检查用户是否在值班配置中
+//        QueryWrapper<DutyPerson> wrapper = new QueryWrapper<>();
+//        wrapper.eq("userId", userId);
+//        wrapper.eq("isDelete", 0);
+//        List<DutyPerson> dutyPersonList = dutyPersonMapper.selectList(wrapper);
+//
+//        if (dutyPersonList == null || dutyPersonList.isEmpty()) {
+//            return 0;
+//        }
+//
+//        // 获取用户的值班类型
+//        boolean isWeekdayDuty = dutyPersonList.stream().anyMatch(dp -> "weekday".equals(dp.getDutyType()));
+//        boolean isSaturdayGroup1 = dutyPersonList.stream().anyMatch(dp -> "saturday_group1".equals(dp.getDutyType()));
+//        boolean isSaturdayGroup2 = dutyPersonList.stream().anyMatch(dp -> "saturday_group2".equals(dp.getDutyType()));
+//        boolean isMonthEndDuty = dutyPersonList.stream().anyMatch(dp -> "month_end".equals(dp.getDutyType()));
+//
+//        if (!isWeekdayDuty && !isSaturdayGroup1 && !isSaturdayGroup2 && !isMonthEndDuty) {
+//            return 0;
+//        }
+//
+//        // 获取基准日期
+//        QueryWrapper<DutyConfig> configWrapper = new QueryWrapper<>();
+//        configWrapper.eq("isDelete", 0);
+//        configWrapper.orderByDesc("createTime");
+//        configWrapper.last("LIMIT 1");
+//        DutyConfig config = dutyConfigMapper.selectOne(configWrapper);
+//        Date baseDate = config != null ? config.getBaseDate() : null;
+//
+//        // 计算时间范围
+//        Calendar now = Calendar.getInstance();
+//        int currentYear = now.get(Calendar.YEAR);
+//        int currentMonth = now.get(Calendar.MONTH);
+//
+//        Calendar startDate = Calendar.getInstance();
+//        Calendar endDate = Calendar.getInstance();
+//
+//        if ("month".equals(type)) {
+//            // 本月
+//            startDate.set(currentYear, currentMonth, 1, 0, 0, 0);
+//            startDate.set(Calendar.MILLISECOND, 0);
+//            endDate.set(currentYear, currentMonth, now.getActualMaximum(Calendar.DAY_OF_MONTH), 23, 59, 59);
+//            endDate.set(Calendar.MILLISECOND, 999);
+//        } else {
+//            // 本年
+//            startDate.set(currentYear, 0, 1, 0, 0, 0);
+//            startDate.set(Calendar.MILLISECOND, 0);
+//            endDate.set(currentYear, 11, 31, 23, 59, 59);
+//            endDate.set(Calendar.MILLISECOND, 999);
+//        }
+//
+//        // 获取今天的日期（忽略时间部分）
+//        Calendar today = Calendar.getInstance();
+//        today.set(Calendar.HOUR_OF_DAY, 0);
+//        today.set(Calendar.MINUTE, 0);
+//        today.set(Calendar.SECOND, 0);
+//        today.set(Calendar.MILLISECOND, 0);
+//
+//        // 计算值班天数（只统计已过去的日期）
+//        int count = 0;
+//        Calendar currentDate = (Calendar) startDate.clone();
+//        currentDate.set(Calendar.HOUR_OF_DAY, 0);
+//        currentDate.set(Calendar.MINUTE, 0);
+//        currentDate.set(Calendar.SECOND, 0);
+//        currentDate.set(Calendar.MILLISECOND, 0);
+//
+//        while (currentDate.before(endDate) || currentDate.equals(endDate)) {
+//            // 只统计当前日期之前的日期（不包括今天）
+//            if (currentDate.before(today)) {
+//                int dayOfWeek = currentDate.get(Calendar.DAY_OF_WEEK); // 1-7, 1是周日
+//                boolean counted = false;
+//
+//                // 检查是否为月末最后两天
+//                boolean isMonthEndDay = isMonthEndDay(currentDate.getTime());
+//
+//                // 如果是月末且用户在月末值班列表中，则计数
+//                if (isMonthEndDay && isMonthEndDuty) {
+//                    count++;
+//                    counted = true;
+//                }
+//
+//                // 周一到周五（2-6）：如果用户在工作日值班列表中，则计数
+//                if (dayOfWeek >= 2 && dayOfWeek <= 6 && isWeekdayDuty) {
+//                    count++;
+//                    counted = true;
+//                }
+//
+//                // 周六（7）：根据单周/双周判断
+//                if (!counted && dayOfWeek == 7) {
+//                    if (baseDate != null) {
+//                        boolean isSingle = isSingleWeek(currentDate.getTime(), baseDate);
+//                        if ((isSingle && isSaturdayGroup1) || (!isSingle && isSaturdayGroup2)) {
+//                            count++;
+//                        }
+//                    } else {
+//                        // 如果没有基准日期，默认单周组
+//                        if (isSaturdayGroup1) {
+//                            count++;
+//                        }
+//                    }
+//                }
+//                // 周日（1）：不安排值班，不计数
+//            }
+//            // 移动到下一天
+//            currentDate.add(Calendar.DAY_OF_MONTH, 1);
+//        }
+//
+//        return count;
+//    }
+    ///  ==============================================END=============================
 
     @Override
     public List<DutyPersonVO> updateDutyConfigFrom(DutyConfigUpdateFromRequest request) {
@@ -522,6 +586,63 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
             deptVOList.add(deptVO);
         }
         return deptVOList;
+    }
+
+    @Override
+    public Long addTemperateDutyPerson(DutyPersonTempareAddRequest request) {
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(request.getUserId() == null || request.getUserId() <= 0, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(request.getDutyType() == null || request.getDutyType().trim().isEmpty(), ErrorCode.PARAMS_ERROR);
+
+        // 验证值班类型
+        // 临时值班添加组
+        String dutyType = request.getDutyType();
+        if (!dutyType.equals("groupe_temporaire")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "并非临时分组");
+        }
+
+        // 检查用户是否存在
+        User user = userMapper.selectById(request.getUserId());
+        ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+
+        // 创建值班人员对象
+        DutyPerson dutyPerson = new DutyPerson();
+        // 将请求体的用户信息赋值给对象
+        BeanUtils.copyProperties(request, dutyPerson);
+        // 检查是否已存在相同的配置
+        dutyPerson = dutyMapper.selectPersonByIdAndIsdelete(dutyPerson);
+        // 先判断是否为空
+        // 拿过来的数据直接拿isDelete是否为0判断，如果是0就返回已存在，不为0为1就进行0修改
+        if(dutyPerson!=null){
+            switch (dutyPerson.getIsDelete()){
+                // 已存在并未逻辑删除
+                case 0: throw new BusinessException(ErrorCode.PARAMS_ERROR, "该用户已在此值班类型中");
+                // 数据存在但是逻辑删除
+                case 1: dutyPerson.setIsDelete(0);
+                        // 修改逻辑删除状态,并判断是否操作成功
+                        if(!dutyPersonMapper.updateByPersonIdIsDelete(dutyPerson)){
+                            throw new BusinessException(ErrorCode.OPERATION_ERROR);
+                        }
+                        break;
+                default:break;
+            }
+            // 数据表中并没有用户排班信息操作
+        }else{
+            // 赋值给对象准备插入表
+            dutyPerson = new DutyPerson();
+            dutyPerson.setUserId(request.getUserId());
+            dutyPerson.setIsDelete(0);
+            dutyPerson.setDutyType(request.getDutyType());
+            try{
+                // 插入表并判断是否操作成功
+                ThrowUtils.throwIf(dutyPersonMapper.insert(dutyPerson) <= 0, ErrorCode.OPERATION_ERROR);
+            }
+            catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+        // 返回添加完成的排班人员id
+        return dutyPerson.getId();
     }
 
 

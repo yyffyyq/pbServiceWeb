@@ -11,11 +11,14 @@ import com.zjintu.schedul.model.dto.duty.*;
 import com.zjintu.schedul.model.vo.duptVO.DeptVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyConfigVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
-import com.zjintu.schedul.service.DutyRecordService;
-import com.zjintu.schedul.service.DutyService;
+import com.zjintu.schedul.service.dupt.DutyRecordService;
+import com.zjintu.schedul.service.dupt.DutyService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -82,6 +85,71 @@ public class DutyController {
         }
         return ResultUtils.success(id);
     }
+
+/// ================================临时组相关业务逻辑======================================================
+    /**
+     * 添加临时值班人员(仅管理员) 这是单个插入
+     * @param request 新增临时值班人员
+     * @return
+     */
+    // todo 这里有逻辑上的问题，在上面单双分组修改之后会把这个里的isDelete的值修改成1也就是逻辑删除，我想要重新加入值会显示已经加入，但是逻辑上是删除了的，
+    // todo 我现在需要把isDelete修改成0
+    @PostMapping("/temperate/add")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "新增临时分组人员接口", description = "用于某日临时分组新增值班人员")
+    public BaseResponse<String> addTemperateDutyPersoon(@RequestBody DutyPersonTempareAddRequest request){
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+//        Long id = dutyService.addTemperateDutyPerson(request);
+        try{
+            // 获取到需要修改的那天
+            Date currentDate = request.getBaseDate();
+            // 拿着日期去更新
+            String result = dutyRecordService.updateTheDayDutyRecord(currentDate,request.getUserId(),request.getDutyType());
+            return ResultUtils.success("添加成功"+result);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return ResultUtils.success("添加成功");
+    }
+    // 这里在单个插入的基础上进行批量插入临时组
+    @PostMapping("/temperate/addBatch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "新增临时分组批量人员接口", description = "用于某日临时分组新增值班批量人员")
+    public BaseResponse<List<String>> addBatchTemperateDutyPerson(@RequestBody DutyPersonTempareAddBatchRequest requestList){
+        ThrowUtils.throwIf(requestList == null, ErrorCode.PARAMS_ERROR);
+        // 获取增加日期
+        Date currentDate = requestList.getBaseDate();
+        // 获取分组名称
+        String type_group = requestList.getDutyType();
+        // 获取用户是否添加成功值
+        List<Long> RequestUserIdList = requestList.getUserIdList();
+        List<String> resultList = new ArrayList<>();
+        try{
+            for(Long requestId : RequestUserIdList){
+                // 获取需要修改的那天
+                // 拿着日期去更新
+                String result = dutyRecordService.updateTheDayDutyRecord(currentDate,requestId,type_group);
+                resultList.add(result);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return ResultUtils.success(resultList);
+    }
+
+
+    // 查看临时组情况
+
+    // 删除临时组人员值班
+    @PostMapping("/temperate/delete")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "删除临时分组人员接口", description = "用于某日临时分组删除值班人员")
+    public BaseResponse<String> deleteTemperateDutyPersoon(@RequestBody DeleteRequest request){
+        return null;
+    }
+
+
+/// =====================================END===============================================================
 
     /**
      * 删除值班人员（仅管理员）

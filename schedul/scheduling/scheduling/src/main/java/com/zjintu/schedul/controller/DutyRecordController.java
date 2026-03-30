@@ -7,7 +7,7 @@ import com.zjintu.schedul.common.ResultUtils;
 import com.zjintu.schedul.constant.UserConstant;
 import com.zjintu.schedul.exception.ThrowUtils;
 import com.zjintu.schedul.model.vo.duptVO.DutyRecordVO;
-import com.zjintu.schedul.service.DutyRecordService;
+import com.zjintu.schedul.service.dupt.DutyRecordService;
 import jakarta.annotation.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;

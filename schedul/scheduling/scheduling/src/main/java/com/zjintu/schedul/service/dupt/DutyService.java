@@ -1,4 +1,4 @@
-package com.zjintu.schedul.service;
+package com.zjintu.schedul.service.dupt;
 
 import com.zjintu.schedul.model.dto.duty.*;
 import com.zjintu.schedul.model.vo.duptVO.DeptVO;
@@ -62,6 +62,13 @@ public interface DutyService {
      * @return List<DeptVO>
      */
     List<DeptVO> selectDeptVOList();
+
+    /**
+     * 新增临时分组人员信息
+     * @param request
+     * @return
+     */
+    Long addTemperateDutyPerson(DutyPersonTempareAddRequest request);
 
 }
 

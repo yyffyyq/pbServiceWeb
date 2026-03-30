@@ -1,4 +1,4 @@
-package com.zjintu.schedul.service;
+package com.zjintu.schedul.service.dupt;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -60,4 +60,11 @@ public interface DutyRecordService extends IService<DutyRecord> {
      * @return 值班记录列表
      */
     List<DutyRecordVO> getDutyRecordsByDateRange(Date startDate, Date endDate);
+
+    /**
+     * 更新临时组排班记录
+     * @param currentDate 插入临时组排班日期
+     * @param userId 增加记录人员id
+     */
+    String updateTheDayDutyRecord(Date currentDate,Long userId,String type_group);
 }
