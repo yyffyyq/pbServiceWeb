@@ -2,7 +2,9 @@ package com.zjintu.schedul.service.dupt;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.zjintu.schedul.model.dto.duty.DutyRecordTempareRequest;
 import com.zjintu.schedul.model.entity.dupt.DutyRecord;
+import com.zjintu.schedul.model.vo.duptVO.DutyRecordTempareVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyRecordVO;
 
 import java.util.Date;
@@ -67,4 +69,29 @@ public interface DutyRecordService extends IService<DutyRecord> {
      * @param userId 增加记录人员id
      */
     String updateTheDayDutyRecord(Date currentDate,Long userId,String type_group);
+
+    /**
+     * 通过部门编号、查询时间确定返回临时值班组人员
+     * @param deptId 部门编号
+     * @param dutyRecordTempareRequest 请求日期
+     * @return
+     */
+    List<DutyRecordTempareVO> selectUserDuptTypeBydeptIdAndDuptDate(Long deptId, DutyRecordTempareRequest dutyRecordTempareRequest);
+
+    /**
+     * 获取用户临时组用户编号列表
+     * @param currentDate 查看日期
+     * @param typeGroup 查看分组
+     * @return 返回用户id列表
+     */
+    List<Long> selectUserIdByGroupAndDate(Date currentDate, String typeGroup);
+
+    /**
+     * 删除临时组值班人员信息
+     * @param currentDate 插入临时组排班日期
+     * @param deleteUserId 增加记录人员id
+     * @param typeGroup 修改分组
+     * @return 返回修改人员信息
+     */
+    String deleteTheDayDutyRecord(Date currentDate, Long deleteUserId, String typeGroup);
 }

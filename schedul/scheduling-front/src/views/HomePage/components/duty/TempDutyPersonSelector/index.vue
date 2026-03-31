@@ -47,12 +47,26 @@
               @selection-change="handleSelectionChange"
               v-loading="loadingUser"
           >
-            <el-table-column type="selection" :reserve-selection="true" width="55" align="center" />
+            <el-table-column
+                type="selection"
+                :reserve-selection="true"
+                :selectable="checkSelectable"
+                width="55"
+                align="center"
+            />
             <el-table-column prop="userName" label="姓名" width="120" />
             <el-table-column prop="userAccount" label="账号/工号" />
             <el-table-column prop="userRole" label="角色" width="100">
               <template #default="{ row }">
                 <span class="role-tag">{{ row.userRole === 'admin' ? '管理员' : '普通用户' }}</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="当天状态" width="100">
+              <template #default="{ row }">
+                <span v-if="row.dutyType === 'groupe_temporaire'" style="color: #67c23a; font-size: 12px;">临时组</span>
+                <span v-else-if="row.dutyType" style="color: #e6a23c; font-size: 12px;">已在其他组</span>
+                <span v-else style="color: #909399; font-size: 12px;">未排班</span>
               </template>
             </el-table-column>
           </el-table>
@@ -93,7 +107,8 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Search } from '@element-plus/icons-vue';
-import { getDeptList, getUserByDeptId, addTempDutyBatch } from './api';
+// ----------引入接口-----
+import { getDeptList, getUserByDeptId, getTempDutyAccountByDeptId, addTempDutyBatch } from './api';
 
 const props = defineProps({
   show: Boolean,
@@ -115,26 +130,32 @@ const submitting = ref(false);
 
 const deptList = ref([]);
 const activeDeptId = ref(null);
-const userList = ref([]); // 当前部门的员工列表
+const userList = ref([]);
 
 const searchKeyword = ref('');
 const selectedIds = ref([]);
 const remark = ref('');
 
-// 监听弹窗打开，初始化部门数据
+// --- 判断是否可以勾选的逻辑 ---
+const checkSelectable = (row) => {
+  // 如果当天他有值班类型，且不是临时组（说明是单双周组），则变灰不可选
+  if (row.dutyType && row.dutyType !== 'groupe_temporaire') {
+    return false;
+  }
+  return true; // 未排班的，或者已经是临时组的，允许操作
+};
+
 watch(() => props.show, async (val) => {
   if (val) {
     await loadDepts();
   }
 });
 
-// 1. 加载部门列表
 const loadDepts = async () => {
   loadingDept.value = true;
   try {
     const res = await getDeptList();
     deptList.value = res.data || [];
-    // 如果有部门，默认选中第一个部门并加载其员工
     if (deptList.value.length > 0) {
       handleDeptClick(deptList.value[0].id);
     }
@@ -145,20 +166,55 @@ const loadDepts = async () => {
   }
 };
 
-// 2. 点击部门，加载该部门下的员工
+// 先获取部门信息，然后通过部门信息获取员工信息，把他组装在一起，作为主基调
+// --- 双重请求 + 数据组装 ---
 const handleDeptClick = async (deptId) => {
-  if (activeDeptId.value === deptId) return; // 避免重复点击
+  if (activeDeptId.value === deptId) return;
 
   activeDeptId.value = deptId;
   loadingUser.value = true;
-  searchKeyword.value = ''; // 切换部门时清空搜索框
+  searchKeyword.value = '';
 
   try {
-    // 传入 pageSize 一个较大的值，以拉取该部门下大部分/所有用户用于选择
-    const params = { current: 1, pageSize: 500 };
-    const res = await getUserByDeptId(deptId, params);
-    // 根据你的接口响应结构，数据在 data.records 里
-    userList.value = res.data?.records || [];
+    // 1. 获取部门下所有的用户（保底）
+    const userRes = await getUserByDeptId(deptId, { current: 1, pageSize: 500 });
+    const allUsers = userRes.data?.records || [];
+
+    // 2. 获取该部门当天的排班状态（回显）
+    const statusRes = await getTempDutyAccountByDeptId(deptId, {
+      current: 1,
+      pageSize: 500,
+      dutyDate: props.targetDate
+    });
+    const statusRecords = statusRes.data?.records || [];
+
+    // 3. 建立一个映射字典，方便找状态 (userId => dutyType)
+    const statusMap = {};
+    statusRecords.forEach(item => {
+      // API 返回的记录里含有 userId 和 dutyType
+      statusMap[item.userId] = item.dutyType;
+    });
+
+    // 4. 将状态拼接到所有用户数据中
+    userList.value = allUsers.map(user => {
+      return {
+        ...user,
+        // 如果状态表里有他，就打上 dutyType 标记，没有就是 null (未排班)
+        dutyType: statusMap[user.id] || null
+      };
+    });
+
+    // 5. 等待表格 DOM 更新后，执行自动打勾操作
+    await nextTick();
+    if (tableRef.value) {
+      userList.value.forEach(row => {
+        // 如果发现他今天是临时组，自动勾选
+        if (row.dutyType === 'groupe_temporaire') {
+          tableRef.value.toggleRowSelection(row, true);
+        }
+      });
+    }
+
   } catch (error) {
     console.error("加载员工失败:", error);
   } finally {
@@ -166,7 +222,6 @@ const handleDeptClick = async (deptId) => {
   }
 };
 
-// 本地搜索过滤逻辑 (仅过滤当前右侧展示的员工)
 const filteredPersons = computed(() => {
   if (!searchKeyword.value) return userList.value;
   const lowerKeyword = searchKeyword.value.toLowerCase();
@@ -175,18 +230,12 @@ const filteredPersons = computed(() => {
   );
 });
 
-// 监听多选框变化 (跨部门保留选中)
+// 因为 row-key 是 id，这里直接取 row.id
 const handleSelectionChange = (selection) => {
-  // 因为开启了 reserve-selection，这里的 selection 会包含所有历史选中的行
   selectedIds.value = selection.map(row => row.id);
 };
 
-// 提交批量新增
 const handleSubmit = async () => {
-  if (selectedIds.value.length === 0) {
-    return ElMessage.warning('请至少选择一名人员进行排班');
-  }
-
   submitting.value = true;
   try {
     const payload = {
@@ -196,10 +245,11 @@ const handleSubmit = async () => {
       userIdList: selectedIds.value
     };
 
+    // ----------------------添加临时组排班接口--------------------------------
     const res = await addTempDutyBatch(payload);
 
     if (res.code === 0) {
-      ElMessage.success(`成功为 ${selectedIds.value.length} 人添加临时排班`);
+      ElMessage.success(`操作成功`);
       emit('success');
       visible.value = false;
     } else {
@@ -212,14 +262,12 @@ const handleSubmit = async () => {
   }
 };
 
-// 弹窗关闭后清理残留数据
 const handleClosed = () => {
   searchKeyword.value = '';
   selectedIds.value = [];
   remark.value = '';
   activeDeptId.value = null;
   userList.value = [];
-  // 必须清空表格的选中状态，否则下次打开弹窗还会保留上次勾选的人
   if (tableRef.value) {
     tableRef.value.clearSelection();
   }

@@ -25,3 +25,11 @@ export function addTempDutyBatch(data) {
         data // { baseDate, dutyType, remark, userIdList }
     });
 }
+// 获取带有当天临时组值班状态的部门人员列表
+export function getTempDutyAccountByDeptId(deptId, params) {
+    return request({
+        url: `/user/temporary/account/${deptId}`,
+        method: 'get',
+        params // 包含 dutyDate, current, pageSize
+    });
+}

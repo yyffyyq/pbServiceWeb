@@ -1,6 +1,7 @@
 package com.zjintu.schedul.service.dupt.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.exception.BusinessException;
@@ -27,10 +28,16 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.DayOfWeek;
+import java.time.temporal.ChronoUnit;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoField;
 import java.util.*;
 
 /**
@@ -230,8 +237,9 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
                     result.addAll(getDutyPersonListByType("saturday_group2"));
                 }
             } else {
-                // 如果没有基准日期，默认返回单周组
-                result.addAll(getDutyPersonListByType("saturday_group1"));
+                // 🚨 黄金修改点：不要默默兜底，直接抛出业务异常阻断流程！
+                log.error("生成排班失败：数据库 duty_config 表中缺少基准日期(baseDate)配置！");
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "系统缺少单双周基准日期配置，请先联系管理员前往配置页面设置！");
             }
             return result;
         }
@@ -243,30 +251,23 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
     /**
      * 判断指定日期是单周还是双周
      */
+    /**
+     * 判断指定日期是单周还是双周（基于自然的星期一为一周起点的规则）
+     */
     private boolean isSingleWeek(Date targetDate, Date baseDate) {
-        Calendar base = Calendar.getInstance();
-        base.setTime(baseDate);
-        base.set(Calendar.HOUR_OF_DAY, 0);
-        base.set(Calendar.MINUTE, 0);
-        base.set(Calendar.SECOND, 0);
-        base.set(Calendar.MILLISECOND, 0);
+        LocalDate target = targetDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate base = baseDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
-        Calendar target = Calendar.getInstance();
-        target.setTime(targetDate);
-        target.set(Calendar.HOUR_OF_DAY, 0);
-        target.set(Calendar.MINUTE, 0);
-        target.set(Calendar.SECOND, 0);
-        target.set(Calendar.MILLISECOND, 0);
+        // 统一将两个日期都对齐到各自所在周的“星期一”
+        LocalDate targetMonday = target.with(DayOfWeek.MONDAY);
+        LocalDate baseMonday = base.with(DayOfWeek.MONDAY);
 
-        long diffTime = target.getTimeInMillis() - base.getTimeInMillis();
-        long diffDays = diffTime / (1000 * 60 * 60 * 24);
-        // 关键：避免 diffDays 为负数（当 targetDate < baseDate 时），取绝对值
-        long diffWeeks = Math.abs(diffDays) / 7;
+        // 计算两个星期一之间相差的完整周数
+        long diffWeeks = Math.abs(ChronoUnit.WEEKS.between(baseMonday, targetMonday));
 
-        // 周数差为偶数 → 单周；奇数 → 双周
+        // 如果相差偶数周，说明属性相同（同为单周或同为双周）；奇数周则翻转
         return diffWeeks % 2 == 0;
     }
-
     /**
      * 判断是否为月末最后两天
      */
@@ -286,6 +287,12 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
         return day == lastDay || day == lastDay - 1;
     }
 
+    /**
+     * 计算值班天数
+     * @param userId 用户ID
+     * @param type 统计类型：month-本月, year-本年
+     * @return
+     */
     @Override
     public Integer getDutyCount(Long userId, String type) {
         ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
@@ -446,121 +453,77 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
     ///  ==============================================END=============================
 
     @Override
+    // todo 这个是干嘛的？
+    @Transactional(rollbackFor = Exception.class)
     public List<DutyPersonVO> updateDutyConfigFrom(DutyConfigUpdateFromRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(request.getStartDate() == null || request.getStartDate().trim().isEmpty(), ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(request.getConfig() == null || request.getConfig().isEmpty(), ErrorCode.PARAMS_ERROR);
 
         try {
-            // 解析开始日期（更新起点）
+            // ... 前面的时间解析逻辑保持不变 ...
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             Date startDate = sdf.parse(request.getStartDate());
 
-            // 截断开始日期的时间部分（确保按天对比）
             Calendar startCal = Calendar.getInstance();
             startCal.setTime(startDate);
             startCal.set(Calendar.HOUR_OF_DAY, 0);
-            startCal.set(Calendar.MINUTE, 0);
-            startCal.set(Calendar.SECOND, 0);
-            startCal.set(Calendar.MILLISECOND, 0);
+            // ... 省略截断时间代码 ...
             Date actualStartDate = startCal.getTime();
 
-            // 计算结束日期（未来1年，同样截断时间）
             Calendar endCal = Calendar.getInstance();
             endCal.setTime(actualStartDate);
             endCal.add(Calendar.YEAR, 1);
-            // 关键：截断结束日期的时间部分，与 currentCal 格式一致
-            endCal.set(Calendar.HOUR_OF_DAY, 0);
-            endCal.set(Calendar.MINUTE, 0);
-            endCal.set(Calendar.SECOND, 0);
-            endCal.set(Calendar.MILLISECOND, 0);
+            // ... 省略截断时间代码 ...
             Date actualEndDate = endCal.getTime();
 
             Map<String, Object> config = request.getConfig();
-
-            // 第一步：仅同步请求中存在的值班类型（不影响其他类型）
             syncDutyPersonsFromConfig(config);
 
-            // 第二步：获取基准日期（用于判断单双周）
             QueryWrapper<DutyConfig> configWrapper = new QueryWrapper<>();
             configWrapper.eq("isDelete", 0);
             configWrapper.orderByDesc("createTime");
             configWrapper.last("LIMIT 1");
             DutyConfig dutyConfig = dutyConfigMapper.selectOne(configWrapper);
-
             Date baseDate = dutyConfig != null ? dutyConfig.getBaseDate() : null;
 
-            // 第三步：遍历「指定日期及之后」的每一天（修复循环终止条件）
-            Calendar currentCal = Calendar.getInstance();
-            currentCal.setTime(actualStartDate); // 从指定日期开始
+            // 🌟 严格执行 SQL: UPDATE duty_record SET isDelete = 1 WHERE dutyDate > CURDATE();
+            // ==========================================
+            LambdaUpdateWrapper<DutyRecord> updateWrapper = new LambdaUpdateWrapper<>();
 
-            // 关键：使用 Calendar 的 compareTo 方法对比日期（避免时间格式问题）
+            // 使用 apply 直接调用 MySQL 的原生 CURDATE() 函数
+            updateWrapper.apply("dutyDate > CURDATE()");
+            // 排除临时排班
+            updateWrapper.ne(DutyRecord::getDutyType, "groupe_temporaire");
+            // SET isDelete = 1
+            updateWrapper.set(DutyRecord::getIsDelete, 1);
+
+            dutyRecordMapper.update(null, updateWrapper);
+
+
+            // ==========================================
+
+            // 第三步：遍历「指定日期及之后」的每一天
+            Calendar currentCal = Calendar.getInstance();
+            currentCal.setTime(actualStartDate);
+
             while (currentCal.compareTo(endCal) <= 0) {
                 Date currentDate = currentCal.getTime();
-                int dayOfWeek = currentCal.get(Calendar.DAY_OF_WEEK); // 1=周日, 7=周六
-                boolean isMonthEnd = isMonthEndDay(currentDate);
 
-                // 1. 删除当天的所有值班记录（仅删除指定日期及之后的）
-                QueryWrapper<DutyRecord> deleteWrapper = new QueryWrapper<>();
-                deleteWrapper.apply("DATE(dutyDate) = DATE({0})", currentDate);
-                deleteWrapper.eq("isDelete", 0);
-                dutyRecordMapper.delete(deleteWrapper);
+                // 核心妙招：直接调用咱们刚修好的 getDutyPersonListByDate 方法！
+                // 它内部已经完美处理好了：是不是工作日？是不是周末？单周还是双周？是不是月末？
+                List<DutyPersonVO> personsForToday = getDutyPersonListByDate(currentDate);
 
-                // 2. 生成当天的值班记录（按类型查询DutyPerson表）
-                List<Long> userIdsForToday = new ArrayList<>();
-
-                // 月末最后两天：添加月末值班人员
-                if (isMonthEnd) {
-                    List<DutyPerson> monthEndPersons = dutyPersonMapper.selectList(
-                            new QueryWrapper<DutyPerson>().eq("dutyType", "month_end").eq("isDelete", 0)
-                    );
-                    for (DutyPerson person : monthEndPersons) {
-                        Long userId = person.getUserId();
-                        if (userId != null && !userIdsForToday.contains(userId)) {
-                            userIdsForToday.add(userId);
-                            createDutyRecord(userId, currentDate, "month_end", request.getRemark());
-                        }
+                // 如果今天需要排班，就把他们一个个写进数据库
+                if (personsForToday != null && !personsForToday.isEmpty()) {
+                    for (DutyPersonVO person : personsForToday) {
+                        // 真正的生成插入动作！
+                        // 注意：这里传的是 person.getId()，也就是真实的 userId
+                        createDutyRecord(person.getId(), currentDate, person.getDutyType(), "配置更新自动重排");
                     }
                 }
 
-                // 工作日（周一到周五）：添加工作日值班人员
-                if (dayOfWeek >= 2 && dayOfWeek <= 6) {
-                    List<DutyPerson> weekdayPersons = dutyPersonMapper.selectList(
-                            new QueryWrapper<DutyPerson>().eq("dutyType", "weekday").eq("isDelete", 0)
-                    );
-                    for (DutyPerson person : weekdayPersons) {
-                        Long userId = person.getUserId();
-                        if (userId != null && !userIdsForToday.contains(userId)) {
-                            userIdsForToday.add(userId);
-                            createDutyRecord(userId, currentDate, "weekday", request.getRemark());
-                        }
-                    }
-                    // 关键：移动到下一天（必须在 continue 之前）
-                    currentCal.add(Calendar.DAY_OF_MONTH, 1);
-                    continue;
-                }
-
-                // 周六：添加对应单/双周组人员
-                if (dayOfWeek == 7) {
-                    boolean isSingle = baseDate != null ? isSingleWeek(currentDate, baseDate) : true;
-                    String dutyType = isSingle ? "saturday_group1" : "saturday_group2";
-
-                    List<DutyPerson> saturdayPersons = dutyPersonMapper.selectList(
-                            new QueryWrapper<DutyPerson>().eq("dutyType", dutyType).eq("isDelete", 0)
-                    );
-                    for (DutyPerson person : saturdayPersons) {
-                        Long userId = person.getUserId();
-                        if (userId != null && !userIdsForToday.contains(userId)) {
-                            userIdsForToday.add(userId);
-                            createDutyRecord(userId, currentDate, dutyType, request.getRemark());
-                        }
-                    }
-                    // 关键：移动到下一天（必须在 continue 之前）
-                    currentCal.add(Calendar.DAY_OF_MONTH, 1);
-                    continue;
-                }
-
-                // 周日：仅月末值班人员（已在上面处理），直接移动到下一天
+                // 游标推进一步：进入下一天
                 currentCal.add(Calendar.DAY_OF_MONTH, 1);
             }
 
@@ -571,7 +534,6 @@ public class DutyServiceImpl extends ServiceImpl<DutyPersonMapper, DutyPerson> i
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新值班配置失败");
         }
     }
-
     /**
      * 获取部门信息接口
      * @return

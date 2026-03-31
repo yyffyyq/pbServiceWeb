@@ -15,11 +15,14 @@ import com.zjintu.schedul.common.ResultUtils;
 import com.zjintu.schedul.constant.UserConstant;
 import com.zjintu.schedul.exception.BusinessException;
 import com.zjintu.schedul.exception.ThrowUtils;
+import com.zjintu.schedul.model.dto.duty.DutyRecordTempareRequest;
 import com.zjintu.schedul.model.dto.user.*;
 import com.zjintu.schedul.model.entity.user.User;
 import com.zjintu.schedul.model.entity.dupt.DeptToUser;
+import com.zjintu.schedul.model.vo.duptVO.DutyRecordTempareVO;
 import com.zjintu.schedul.model.vo.userVO.LoginUserVO;
 import com.zjintu.schedul.model.vo.userVO.UserVO;
+import com.zjintu.schedul.service.dupt.DutyRecordService;
 import com.zjintu.schedul.service.dupt.DutyService;
 import com.zjintu.schedul.service.user.UserService;
 import com.zjintu.schedul.service.dupt.DuptToUserService;
@@ -47,9 +50,51 @@ public class UserController {
     @Resource
     private DuptToUserService duptToUserService;
 
+    @Resource
+    private DutyRecordService dutyRecordService;
+
 
     // 在类中注入或静态调用
     private static final Snowflake snowflake = IdUtil.getSnowflake(1, 1);
+
+    /**
+     * 临时添加组数据回显功能
+     */
+    @GetMapping("/temporary/account/{deptId}")
+    @Operation(summary = "根据部门编号查询" ,description = "")
+    public BaseResponse<Page<DutyRecordTempareVO>> selectTempareAccount(@PathVariable Long deptId,
+            DutyRecordTempareRequest dutyRecordTempareRequest){
+        ThrowUtils.throwIf(deptId==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(dutyRecordTempareRequest.getDutyDate()==null,ErrorCode.PARAMS_ERROR,"日期参数不可为空");
+
+        //通过部门id先获取到用户信息，然后再通过用户信息和日期获取到值班分组情况
+        List<DutyRecordTempareVO> temporaryVOList = dutyRecordService.selectUserDuptTypeBydeptIdAndDuptDate(deptId,dutyRecordTempareRequest);
+        // 获取封装后列表长度
+        int total = temporaryVOList.size();
+        // 那到分页查询信息
+        long current = dutyRecordTempareRequest.getCurrent();
+        long size = dutyRecordTempareRequest.getPageSize();
+
+        /// 计算截取范围
+        //todo 为什么要这么做？
+        int formIndex= (int)((current-1)*size);
+        int toIndex = Math.min(formIndex+(int)size, total);
+
+        /// 2. 如果该部门没用户，直接返回空分页对象
+        if (CollectionUtils.isEmpty(temporaryVOList)) {
+            return ResultUtils.success(new Page<>(current, size, 0));
+        }
+        // 创建分页查询
+        Page<DutyRecordTempareVO> dutyRecordTempareVOPage = new Page<>(current, size,total);
+        // 安全截取：防止 current 过大导致 fromIndex > total
+        // todo 为什么？
+        if (formIndex < total && formIndex >= 0) {
+            dutyRecordTempareVOPage.setRecords(temporaryVOList.subList(formIndex, toIndex));
+        }
+        // 返回分页值
+        return ResultUtils.success(dutyRecordTempareVOPage);
+    }
+
 
     /**
      * 用户查询列表，根据部门id

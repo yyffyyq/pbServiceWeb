@@ -6,14 +6,18 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjintu.schedul.common.ErrorCode;
 import com.zjintu.schedul.exception.BusinessException;
 import com.zjintu.schedul.exception.ThrowUtils;
+import com.zjintu.schedul.mapper.duty.DeptToUserMapper;
 import com.zjintu.schedul.mapper.duty.DutyRecordMapper;
 import com.zjintu.schedul.mapper.user.UserMapper;
+import com.zjintu.schedul.model.dto.duty.DutyRecordTempareRequest;
 import com.zjintu.schedul.model.entity.dupt.DutyRecord;
 import com.zjintu.schedul.model.entity.user.User;
 import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
+import com.zjintu.schedul.model.vo.duptVO.DutyRecordTempareVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyRecordVO;
 import com.zjintu.schedul.service.dupt.DutyRecordService;
 import com.zjintu.schedul.service.dupt.DutyService;
+import com.zjintu.schedul.utils.ClearDateUtils;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -44,6 +48,9 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
 
     @Resource
     private DutyRecordMapper dutyRecordMapper;
+
+    @Resource
+    private DeptToUserMapper deptToUserMapper;
 
 
     @Override
@@ -224,7 +231,8 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
         // todo 需要添加判断，判断该用户是否在这一天值班，逻辑删除是否删除，分别用三套方案
         // 根据日期以及用户id去判断是否存在这天排班，该用户
         DutyRecord record = new DutyRecord();
-        record.setDutyDate(atStartOfDay(currentDate));
+//        record.setDutyDate(atStartOfDay(currentDate));
+        record.setDutyDate(currentDate);
         record.setUserId(userId);
         record.setDutyType(type_group);
         record = dutyRecordMapper.selectDutyRecord(record);
@@ -232,7 +240,7 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
         if (record != null) {
             switch (record.getIsDelete()){
                 case 0:result = "已存在";break;
-                case 1:ThrowUtils.throwIf(dutyRecordMapper.updateIsdelete(record), ErrorCode.OPERATION_ERROR);
+                case 1:ThrowUtils.throwIf(!dutyRecordMapper.updateIsdelete(record), ErrorCode.OPERATION_ERROR);
                 result = "添加成功";
                 break;
                 default:break;
@@ -248,6 +256,76 @@ public class DutyRecordServiceImpl extends ServiceImpl<DutyRecordMapper, DutyRec
         }
         return result;
     }
+
+    /**
+     * 通过部门编号、查询时间确定返回临时值班组人员
+     * @param deptId 部门编号
+     * @param dutyRecordTempareRequest 请求日期
+     * @return
+     */
+    @Override
+    public List<DutyRecordTempareVO> selectUserDuptTypeBydeptIdAndDuptDate(Long deptId, DutyRecordTempareRequest dutyRecordTempareRequest) {
+        // 先获取需要回显的日期
+        Date currentDate = ClearDateUtils.atStartOfDay(dutyRecordTempareRequest.getDutyDate());
+        // 拿部门编号去查询用户编号
+        List<Long> userIds = deptToUserMapper.selectUserIdByDuptId(deptId);
+        if(userIds==null){
+            return new ArrayList<>();
+        }
+        // 创建回显对象，放入用户编号、值班组名、用户名字
+        List<DutyRecordTempareVO> vos = new ArrayList<>();
+        // 那这用户编号和需要回显日期获取到这一天的人员值班组
+        // 这里需要做一个判断，判断该日这个userId是否有值班
+        for(Long userId:userIds){
+            DutyRecordTempareVO vo = new DutyRecordTempareVO();
+            String dutyType = dutyRecordMapper.selectByUserIdAndDutyDate(userId,currentDate);
+            if(dutyType!=null){
+                String userName = userMapper.selectById(userId).getUserName();
+                vo.setUserId(userId);
+                vo.setDutyType(dutyType);
+                vo.setUserName(userName);
+                vos.add(vo);
+            }
+        }
+        // 封装返回信息
+        return vos;
+    }
+
+    /**
+     * 获取临时组用户编号列表
+     * @param currentDate 查看日期
+     * @param typeGroup 查看分组
+     * @return 用户编号列表
+     */
+    @Override
+    public List<Long> selectUserIdByGroupAndDate(Date currentDate, String typeGroup) {
+        List<Long> userIds = dutyRecordMapper.selectUserIdList(currentDate,typeGroup);
+        return userIds;
+    }
+
+
+    /**
+     * 删除临时组值班人员信息
+     * @param currentDate 插入临时组排班日期
+     * @param deleteUserId 增加记录人员id
+     * @param typeGroup 修改分组
+     * @return
+     */
+    @Override
+    public String deleteTheDayDutyRecord(Date currentDate, Long deleteUserId, String typeGroup) {
+        // 判断传入值
+        if(userMapper.selectById(deleteUserId) == null){
+            return deleteUserId+"用户不存在";
+        }
+        Long result = dutyRecordMapper.deleteUserIdById(deleteUserId,typeGroup,currentDate);
+
+        //
+        if(result==0){
+            return "删除失败";
+        }
+        return "删除成功";
+    }
+
     /**
      * 将 Date 的时分秒毫秒全部清零，只保留日期部分
      */

@@ -315,10 +315,6 @@
         class="apple-dialog detail-dialog"
     >
       <div class="detail-actions">
-<!--        <el-button v-if="isAdmin && selectedDayInfo.isEditable" class="apple-btn primary-light" :icon="Edit" @click="handleEditDayDuty">-->
-<!--          编辑排班-->
-<!--        </el-button>-->
-<!--        <div v-else></div>-->
         <el-button class="apple-btn success" :icon="Download" @click="exportDetailToPng" :loading="exportLoading">
           导出 PNG
         </el-button>
@@ -767,8 +763,16 @@ const handleSubmitPerson = async () => {
         let updateConfig = null; const newPersons = selectedUserIds.value.map(id => { const u = allUsers.value.find(user => user.id === id); return u ? { id: u.id, userName: u.userName, dept: u.dept, phone: u.phone } : null }).filter(Boolean)
         if (editDutyType.value === 'saturday_group1') { saturdayGroup1.value = newPersons; updateConfig = { saturdayGroup1: newPersons } }
         else if (editDutyType.value === 'saturday_group2') { saturdayGroup2.value = newPersons; updateConfig = { saturdayGroup2: newPersons } }
-        else if (editDutyType.value === 'monthEnd') { monthEndDutyList.value = newPersons; updateConfig = { monthEndDutyList: newPersons } }
-        if (updateConfig) { await updateDutyConfigFrom(editStartDate.value, updateConfig, personForm.remark); ElMessage.success('更新成功') }
+        else if (editDutyType.value === 'monthEnd') {
+          monthEndDutyList.value = newPersons;
+          updateConfig = {
+            monthEndDutyList: newPersons
+          }
+        }
+        if (updateConfig) {
+          await updateDutyConfigFrom(editStartDate.value, updateConfig, personForm.remark);
+          ElMessage.success('更新成功')
+        }
       } else {
         // ==== 这里是配置管理模式的强化逻辑 ====
         let dutyType = "";

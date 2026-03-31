@@ -50,5 +50,30 @@
         set isDelete = 0
         where userId = #{userId}
         and dutyType = #{dutyType}
+        and dutyDate = #{dutyDate}
+    </update>
+
+    <select id="selectByUserIdAndDutyDate" resultType="java.lang.String">
+        select dutyType from duty_record
+        <where>
+            userId = #{userId}
+            and dutyDate = #{currentDate}
+            and isDelete = 0
+        </where>
+    </select>
+    <select id="selectUserIdList" resultType="java.lang.Long">
+        select userId from duty_record
+        <where>
+            dutyDate = #{currentDate}
+        and dutyType = "groupe_temporaire"
+        </where>
+    </select>
+    <update id="deleteUserIdById">
+        update duty_record
+        set isDelete = 1
+        where userId = #{deleteUserId}
+          and dutyType = #{typeGroup}
+          and dutyDate = #{currentDate}
+
     </update>
 </mapper>

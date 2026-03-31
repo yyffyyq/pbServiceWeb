@@ -13,13 +13,12 @@ import com.zjintu.schedul.model.vo.duptVO.DutyConfigVO;
 import com.zjintu.schedul.model.vo.duptVO.DutyPersonVO;
 import com.zjintu.schedul.service.dupt.DutyRecordService;
 import com.zjintu.schedul.service.dupt.DutyService;
+import com.zjintu.schedul.utils.ClearDateUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 /**
  * 值班管理控制器
@@ -117,18 +116,53 @@ public class DutyController {
     @Operation(summary = "新增临时分组批量人员接口", description = "用于某日临时分组新增值班批量人员")
     public BaseResponse<List<String>> addBatchTemperateDutyPerson(@RequestBody DutyPersonTempareAddBatchRequest requestList){
         ThrowUtils.throwIf(requestList == null, ErrorCode.PARAMS_ERROR);
-        // 获取增加日期
-        Date currentDate = requestList.getBaseDate();
+        // todo我这里想要做一个接口二次判断，返回回来的对比这一天数据库的值isdelete为1的值，有哪一些是没有的，直接把他逻辑删除
+        // 获取增加日期，处理日期格式
+        Date currentDate = ClearDateUtils.atStartOfDay(requestList.getBaseDate());
         // 获取分组名称
         String type_group = requestList.getDutyType();
+        // 先获取现在这一天的临时组用户ID
+        List<Long> getUserTodayAllUserIdList = dutyRecordService.selectUserIdByGroupAndDate(currentDate,type_group);
+        if(getUserTodayAllUserIdList==null){
+            getUserTodayAllUserIdList = new ArrayList<>();
+        }
+        // 把请求里的用户列表拿出来和这个ReadyToDelete列表对比选出需要添加操作的，需要删除操作的，和不需要操作的，这里处理好数据让数据库压力小一点
+        List<Long> readyToDeleteUserIdList = new ArrayList<>();
+        List<Long> readyToAddUserIdList = new ArrayList<>();
         // 获取用户是否添加成功值
         List<Long> RequestUserIdList = requestList.getUserIdList();
+        if(RequestUserIdList==null){
+            RequestUserIdList = new ArrayList<>();
+        }
+        // 进行判断筛选
+        // 采用hashset操作
+        Set<Long> existUserIdSet = new HashSet<>(getUserTodayAllUserIdList);
+        Set<Long> requesetUserIdSet = new HashSet<>(RequestUserIdList);
+
+        // 需要删除的用户id列表
+        Set<Long> readyToDeleteUserIdSet = new HashSet<>(existUserIdSet);
+        readyToDeleteUserIdSet.remove(requesetUserIdSet);
+
+        // 需要新增的用户id列表
+        Set<Long> readyToAddUserIdSet = new HashSet<>(requesetUserIdSet);
+        readyToAddUserIdSet.remove(existUserIdSet);
+
         List<String> resultList = new ArrayList<>();
+
+        // todo这里做一个简单的对比选择出需要修改的用户id列表，然后进行操作，用户列表操作分为需要逻辑删除部分和需要添加部分，添加部分就使用下面这个
         try{
-            for(Long requestId : RequestUserIdList){
+            // 删除多余用户操作
+            for(Long deleteUserId :readyToDeleteUserIdSet){
+                String result = dutyRecordService.deleteTheDayDutyRecord(currentDate,deleteUserId,type_group);
+                resultList.add(result);
+            }
+
+
+            // 添加用户操作
+            for(Long addUserId : readyToAddUserIdSet){
                 // 获取需要修改的那天
                 // 拿着日期去更新
-                String result = dutyRecordService.updateTheDayDutyRecord(currentDate,requestId,type_group);
+                String result = dutyRecordService.updateTheDayDutyRecord(currentDate,addUserId,type_group);
                 resultList.add(result);
             }
         }catch (Exception e){

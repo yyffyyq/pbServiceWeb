@@ -10,15 +10,16 @@
 <template>
   <el-dialog v-model="visible" title="值班人员详情" width="900px" class="apple-dialog detail-dialog">
     <div class="detail-actions">
-<!--      <el-button v-if="isAdmin && info.isEditable" class="apple-btn primary-light" :icon="Edit" @click="$emit('edit-click')">编辑排班</el-button>-->
+      <!--===========================临时值班业务逻辑==================-->
       <el-button
-          v-if="isAdmin && info.isEditable"
+          v-if="isAdmin"
           class="apple-btn primary"
           :icon="Plus"
           @click="showTempSelector = true"
       >
         临时排班
       </el-button>
+<!-------------------------------------END----------------------------->
       <el-button v-if="isAdmin && info.isHoliday" class="apple-btn danger" @click="$emit('clear-holiday', info.dateStr)">
         清空放假
       </el-button>
@@ -54,7 +55,7 @@
     <TempDutyPersonSelector
         v-model:show="showTempSelector"
         :target-date="info.dateStr"
-        @success="$emit('refresh')"
+        :existing-persons="info.dutyPersons"  @success="$emit('refresh')"
     />
   </el-dialog>
 </template>

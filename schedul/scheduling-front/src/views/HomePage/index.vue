@@ -145,8 +145,8 @@ const { currentDate, dutyRecordsCache, generateCalendarDays, loadDutyRecords, pr
 const { allConfigs, baseDate, loadAllConfigs, updateBaseDate } = useDutyConfig();
 
 const calendarDays = computed(() => {
-  const trigger = dutyRecordsCache.value;
-  return generateCalendarDays(baseDate.value, allConfigs);
+  // 现在我们只需要把后端查出来的真实排班记录传给日历生成器
+  return generateCalendarDays(dutyRecordsCache.value);
 });
 
 const showConfigDialog = ref(false);
@@ -214,7 +214,9 @@ const onPersonSelectConfirm = async ({ userIds, selectedUsers, remark }) => {
       ElMessage.success('更新成功');
     }
   } else {
-    const typeMap = { weekday: 'weekday', group1: 'saturday_group1', group2: 'saturday_group2', monthEnd: 'month_end' };
+    const typeMap = {
+      weekday: 'weekday', group1: 'saturday_group1', group2: 'saturday_group2', monthEnd: 'month_end'
+    };
     const dutyType = typeMap[currentAddingType.value];
     const listMap = { weekday: 'weekdayDutyList', group1: 'saturdayGroup1', group2: 'saturdayGroup2', monthEnd: 'monthEndDutyList' };
 
@@ -226,11 +228,24 @@ const onPersonSelectConfirm = async ({ userIds, selectedUsers, remark }) => {
 
     let successCount = 0, removeCount = 0;
     for (const userId of newIdsToAdd) {
-      try { const res = await addDutyPerson({ userId, dutyType, remark }); if (res.code === 0) successCount++; } catch (e) {}
+      try {
+        const res = await addDutyPerson({
+          userId, dutyType, remark
+        });
+        if (res.code === 0) successCount++;
+      } catch (e) {
+
+      }
     }
     for (const person of removedPersons) {
       if (person.dutyPersonId) {
-        try { const res = await deleteDutyPerson({ id: person.dutyPersonId, remark: remark || '批量取消' }); if (res.code === 0) removeCount++; } catch (e) {}
+        try {
+          const res = await deleteDutyPerson({
+          id: person.dutyPersonId, remark: remark || '批量取消' });
+          if (res.code === 0) removeCount++;
+        } catch (e) {
+
+        }
       }
     }
     if (successCount > 0 || removeCount > 0) ElMessage.success(`新增 ${successCount} 人，移除 ${removeCount} 人`);
@@ -280,9 +295,40 @@ const handleBaseDateChange = async (val) => {
   if (success) await loadDutyRecords();
 };
 
-const handleSaveConfig = () => {
-  showConfigDialog.value = false;
-  refreshCalendar();
+const handleSaveConfig = async () => {
+  try {
+    await ElMessageBox.confirm(
+        '保存配置将重新生成从明天开始的未来排班记录（现有的自动排班将被重置，临时排班不受影响），是否继续？',
+        '确认保存',
+        { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    );
+
+    // 1. 拆分成 3 个独立的变量
+    const today = new Date().toISOString().split('T')[0];
+    const configData = {
+      weekdayDutyList: allConfigs.weekdayDutyList,
+      saturdayGroup1: allConfigs.saturdayGroup1,
+      saturdayGroup2: allConfigs.saturdayGroup2,
+      monthEndDutyList: allConfigs.monthEndDutyList
+    };
+    const remarkStr = "管理员通过配置管理界面触发重新生成";
+
+    // 2. 重点：按顺序传入 3 个参数，而不是传一个对象！
+    const res = await updateDutyConfigFrom(today, configData, remarkStr);
+
+    if (res.code === 0) {
+      ElMessage.success('配置保存成功，未来排班已更新');
+      showConfigDialog.value = false;
+      await loadDutyRecords();
+    } else {
+      ElMessage.error(res.message || '更新失败');
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('保存配置失败:', error);
+      ElMessage.error('系统异常，保存失败');
+    }
+  }
 };
 
 const initUserInfo = () => {
